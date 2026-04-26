@@ -1,0 +1,3 @@
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/Baims_Group_Hub.html" }]
+}
