@@ -29,10 +29,10 @@ const COLORS = {
 const TEAM = [
   { id: 'shams',  name: 'Shams',  role: 'Marketing',       initials: 'S',  color: '#8B5CF6' },
   { id: 'amira',  name: 'Amira',  role: 'Orcas Lead',      initials: 'A',  color: '#10B981' },
-  { id: 'yousef', name: 'Yousef', role: 'CEO',              initials: 'Y',  color: '#14B8A6' },
+  { id: 'yousef', name: 'Yousef', role: 'CEO',              initials: 'Y',  color: '#0EA5E9' },
   { id: 'ahmad',  name: 'Ahmad',  role: 'Baims Kuwait',    initials: 'AH', color: '#F59E0B' },
   { id: 'bader',  name: 'Bader',  role: 'Product',         initials: 'B',  color: '#EC4899' },
-  { id: 'hossam', name: 'Hossam', role: 'Strategy & Tech', initials: 'H',  color: '#6366F1' },
+  { id: 'hossam', name: 'Hossam', role: 'Strategy & Tech', initials: 'H',  color: '#EF4444' },
   { id: 'khalaf', name: 'Khalaf', role: 'Tech',            initials: 'K',  color: '#F97316' },
 ];
 

@@ -190,9 +190,16 @@ function TaskCard({ task, currentUser, onClick, isDragging, onDragStart, onDragE
           textDecoration: task.status === 'complete' ? 'line-through' : 'none',
           opacity: task.status === 'complete' ? 0.6 : 1,
         }}>
-          {canSee ? task.title : task.title}
+          {task.title}
         </span>
-        {isPrivate && <span style={{ fontSize: 13, flexShrink: 0 }}>🔒</span>}
+        <span style={{
+          fontSize: 10, fontWeight: 700, flexShrink: 0,
+          padding: '2px 6px', borderRadius: 4,
+          background: isPrivate ? '#FEF2F2' : '#EFF6FF',
+          color: isPrivate ? COLORS.red : COLORS.blue,
+        }}>
+          {isPrivate ? '🔒 Private' : '🌐 Public'}
+        </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
         <Avatar memberId={task.ownerId} size={18} />
@@ -313,6 +320,7 @@ function GroupBoard({ currentUser, tasks, setTasks, meetings, onNavigate }) {
 
   function deleteTask(id) {
     setTasks(prev => prev.filter(t => t.id !== id));
+    if (DB.isConfigured()) DB.deleteTask(id).catch(console.error);
   }
 
   function restoreTask(id) {
@@ -495,7 +503,10 @@ function MyBoard({ currentUser, tasks, setTasks, needs, meetings }) {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'complete', completedAt: new Date().toISOString() } : t));
   }
 
-  function deleteTask(id) { setTasks(prev => prev.filter(t => t.id !== id)); }
+  function deleteTask(id) {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    if (DB.isConfigured()) DB.deleteTask(id).catch(console.error);
+  }
 
   function togglePrivacy(taskId) {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, isPrivate: !t.isPrivate } : t));
@@ -570,17 +581,17 @@ function MyBoard({ currentUser, tasks, setTasks, needs, meetings }) {
                           onDragEnd={() => setDraggingId(null)}
                           onClick={() => openTask(t)}
                         />
-                        {/* Privacy toggle on hover */}
+                        {/* Privacy toggle */}
                         <button
                           onClick={e => { e.stopPropagation(); togglePrivacy(t.id); }}
-                          title={t.isPrivate ? 'Make Public' : 'Make Private'}
+                          title={t.isPrivate ? 'Click to make public' : 'Click to make private'}
                           style={{
                             position: 'absolute', top: 6, right: 6,
-                            background: 'rgba(255,255,255,0.9)', border: `1px solid ${COLORS.border}`,
-                            borderRadius: 5, cursor: 'pointer', fontSize: 10, padding: '2px 5px',
-                            color: COLORS.textMuted,
+                            background: 'rgba(255,255,255,0.95)', border: `1px solid ${COLORS.border}`,
+                            borderRadius: 5, cursor: 'pointer', fontSize: 10, padding: '2px 6px',
+                            color: t.isPrivate ? COLORS.red : COLORS.blue, fontWeight: 700,
                           }}>
-                          {t.isPrivate ? '🌐' : '🔒'}
+                          {t.isPrivate ? '🔒→🌐' : '🌐→🔒'}
                         </button>
                       </div>
                     ))

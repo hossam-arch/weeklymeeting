@@ -175,25 +175,43 @@ function FlagCol({ title, color, items, onItemClick }) {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ currentUser, tasks, needs, decisions, updates, meetings, onNavigate }) {
-  const currentMeeting = meetings.find(m => m.status === 'Active') || meetings[0];
-  const meetingUpdates = (currentMeeting && updates[currentMeeting.id]) || {};
+  const [selectedIds, setSelectedIds] = React.useState(() => meetings.map(m => m.id));
+
+  function toggleMeeting(id) {
+    setSelectedIds(prev =>
+      prev.includes(id)
+        ? prev.length > 1 ? prev.filter(x => x !== id) : prev  // keep at least one
+        : [...prev, id]
+    );
+  }
+
+  const allSelected = selectedIds.length === meetings.length;
+
+  // Derive the "reference" meeting for KPIs label (most recent selected)
+  const refMeeting = meetings.find(m => selectedIds.includes(m.id)) || meetings[0];
+  const meetingUpdates = (refMeeting && updates[refMeeting.id]) || {};
+
+  // Filter tasks/needs/decisions to selected meetings
+  const filteredTasks     = tasks.filter(t => !t.meetingId || selectedIds.includes(t.meetingId));
+  const filteredNeeds     = needs.filter(n => !n.meetingId || selectedIds.includes(n.meetingId));
+  const filteredDecisions = decisions.filter(d => !d.meetingId || selectedIds.includes(d.meetingId));
 
   // Overdue tasks
-  const overdueTasks = tasks.filter(t => t.status === 'active' && isOverdue(t.dueDate)).map(t => ({
+  const overdueTasks = filteredTasks.filter(t => t.status === 'active' && isOverdue(t.dueDate)).map(t => ({
     title: t.title,
     sub: `${getTeamMember(t.ownerId)?.name} · due ${formatDate(t.dueDate)}`,
     task: t,
   }));
 
   // Unresolved needs
-  const unresolvedNeeds = needs.filter(n => n.status !== 'done').map(n => ({
+  const unresolvedNeeds = filteredNeeds.filter(n => n.status !== 'done').map(n => ({
     title: n.description,
     sub: `${getTeamMember(n.fromId)?.name} → ${getTeamMember(n.toId)?.name}`,
     need: n,
   }));
 
   // Open decisions
-  const openDecisions = decisions.filter(d => d.status === 'open').map(d => ({
+  const openDecisions = filteredDecisions.filter(d => d.status === 'open').map(d => ({
     title: d.topic,
     sub: `Owner: ${getTeamMember(d.ownerId)?.name}`,
     decision: d,
@@ -201,13 +219,45 @@ function Dashboard({ currentUser, tasks, needs, decisions, updates, meetings, on
 
   return (
     <div style={{ height: '100vh', overflowY: 'auto', background: COLORS.bg, padding: '24px 28px' }}>
+
+      {/* Meeting selector */}
+      <div style={{ marginBottom: 24, background: '#fff', border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: '12px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary }}>TIME RANGE</span>
+          {meetings.map(m => {
+            const sel = selectedIds.includes(m.id);
+            return (
+              <div key={m.id} onClick={() => toggleMeeting(m.id)}
+                style={{
+                  padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  background: sel ? COLORS.brand : '#F3F4F6',
+                  color: sel ? '#fff' : COLORS.textSecondary,
+                  border: `1.5px solid ${sel ? COLORS.brand : 'transparent'}`,
+                  transition: 'all .15s',
+                }}>
+                {m.label}
+              </div>
+            );
+          })}
+          {!allSelected && (
+            <button onClick={() => setSelectedIds(meetings.map(m => m.id))}
+              style={{ fontSize: 11, color: COLORS.brand, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+              Select all
+            </button>
+          )}
+          <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+            {filteredTasks.filter(t => t.status === 'active').length} active tasks across {selectedIds.length} meeting{selectedIds.length > 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+
       {/* Section 1 — Products */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-          <h2 style={{ fontWeight: 800, fontSize: 18, color: COLORS.textPrimary }}>This Week</h2>
-          {currentMeeting && (
-            <span style={{ fontSize: 13, color: COLORS.textMuted }}>{currentMeeting.label} · {currentMeeting.dateRange}</span>
-          )}
+          <h2 style={{ fontWeight: 800, fontSize: 18, color: COLORS.textPrimary }}>KPIs</h2>
+          <span style={{ fontSize: 13, color: COLORS.textMuted }}>
+            {refMeeting ? `${refMeeting.label} · ${refMeeting.dateRange}` : ''}
+          </span>
         </div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {[KPI_DATA.orcas, KPI_DATA.baims, KPI_DATA.medmasters].map(prod => (
@@ -224,7 +274,7 @@ function Dashboard({ currentUser, tasks, needs, decisions, updates, meetings, on
             <PulseCard
               key={member.id}
               member={member}
-              tasks={tasks}
+              tasks={filteredTasks}
               updates={meetingUpdates[member.id]}
               onClick={() => onNavigate('board')}
             />

@@ -140,12 +140,18 @@ async function syncUpdates(updates) {
   if (error) console.error('sync updates:', error);
 }
 
-// Delete a single task/need (used on hard-delete)
+// Delete a single record (used on hard-delete)
 async function deleteTask(id) {
   await _sb.from('tasks').delete().eq('id', id);
 }
 async function deleteNeed(id) {
   await _sb.from('needs').delete().eq('id', id);
+}
+async function deleteDecision(id) {
+  await _sb.from('decisions').delete().eq('id', id);
+}
+async function deleteMeeting(id) {
+  await _sb.from('meetings').delete().eq('id', id);
 }
 
 // ─── REALTIME ────────────────────────────────────────────────────────────────
@@ -242,7 +248,7 @@ window.DB = {
   isConfigured, init,
   fetchAll,
   syncMeetings, syncTasks, syncNeeds, syncDecisions, syncUpdates,
-  deleteTask, deleteNeed,
+  deleteTask, deleteNeed, deleteDecision, deleteMeeting,
   subscribe,
   importMeetingBundle,
   testConnection,

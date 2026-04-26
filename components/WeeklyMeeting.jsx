@@ -286,6 +286,7 @@ function NeedsTab({ meetingId, currentUser, needs, setNeeds }) {
 
   function cancelNeed(id) {
     setNeeds(prev => prev.filter(n => n.id !== id));
+    if (DB.isConfigured()) DB.deleteNeed(id).catch(console.error);
   }
 
   return (
@@ -396,6 +397,12 @@ function DecisionsTab({ meetingId, currentUser, decisions, setDecisions }) {
     setDecisions(prev => prev.map(d => d.id === id ? { ...d, status: 'deferred' } : d));
   }
 
+  function deleteDecision(id) {
+    if (!window.confirm('Delete this decision? This cannot be undone.')) return;
+    setDecisions(prev => prev.filter(d => d.id !== id));
+    if (DB.isConfigured()) DB.deleteDecision(id).catch(console.error);
+  }
+
   function toggleRelevant(id) {
     setForm(p => ({
       ...p,
@@ -483,17 +490,80 @@ function DecisionsTab({ meetingId, currentUser, decisions, setDecisions }) {
                       </p>
                     )}
                   </div>
-                  {dec.status === 'open' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      <Btn variant="success" size="sm" onClick={() => approve(dec.id)}>✓ Approve</Btn>
-                      <Btn size="sm" onClick={() => defer(dec.id)}>→ Defer</Btn>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    {dec.status === 'open' && (
+                      <>
+                        <Btn variant="success" size="sm" onClick={() => approve(dec.id)}>✓ Approve</Btn>
+                        <Btn size="sm" onClick={() => defer(dec.id)}>→ Defer</Btn>
+                      </>
+                    )}
+                    {(dec.ownerId === currentUser.id || dec.status !== 'open') && (
+                      <Btn variant="danger" size="sm" onClick={() => deleteDecision(dec.id)}>🗑</Btn>
+                    )}
+                  </div>
                 </div>
               </Card>
             );
           })
       }
+    </div>
+  );
+}
+
+// ─── PUBLIC BOARD TAB ─────────────────────────────────────────────────────────
+function PublicBoardTab({ meetingId, tasks }) {
+  const publicTasks = tasks.filter(t => t.meetingId === meetingId && !t.isPrivate && t.status === 'active');
+  const quadrants = [
+    { id: 'do-first',  label: 'Do First',  sublabel: 'Urgent + Important',        accentColor: COLORS.red   },
+    { id: 'schedule',  label: 'Schedule',  sublabel: 'Not Urgent + Important',     accentColor: COLORS.blue  },
+    { id: 'delegate',  label: 'Delegate',  sublabel: 'Urgent + Not Important',     accentColor: COLORS.amber },
+    { id: 'eliminate', label: 'Eliminate', sublabel: 'Not Urgent + Not Important', accentColor: COLORS.gray  },
+  ];
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <h3 style={{ fontWeight: 700, fontSize: 15 }}>Public Board</h3>
+        <span style={{ fontSize: 11, fontWeight: 600, background: COLORS.greenLight, color: COLORS.green, padding: '2px 10px', borderRadius: 12 }}>
+          🖥 Screen-share safe — private tasks hidden
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {quadrants.map(q => {
+          const qTasks = publicTasks.filter(t => t.quadrant === q.id);
+          return (
+            <div key={q.id} style={{ background: '#fff', border: `1.5px solid ${COLORS.border}`, borderRadius: 10, padding: 14, minHeight: 100 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${COLORS.border}` }}>
+                <div style={{ width: 4, height: 14, borderRadius: 2, background: q.accentColor }} />
+                <span style={{ fontWeight: 700, fontSize: 13 }}>{q.label}</span>
+                <span style={{ fontSize: 11, color: COLORS.textMuted }}>{q.sublabel}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: q.accentColor + '22', color: q.accentColor, padding: '1px 7px', borderRadius: 10 }}>{qTasks.length}</span>
+              </div>
+              {qTasks.length === 0
+                ? <div style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', padding: '12px 0' }}>—</div>
+                : qTasks.map(t => {
+                    const owner = getTeamMember(t.ownerId);
+                    return (
+                      <div key={t.id} style={{
+                        padding: '8px 10px', marginBottom: 6, borderRadius: 7,
+                        border: `1px solid ${COLORS.border}`, borderLeft: `3px solid ${owner?.color || COLORS.brand}`,
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: COLORS.textPrimary, marginBottom: 4 }}>{t.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Avatar memberId={t.ownerId} size={16} />
+                          <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{owner?.name}</span>
+                          <ProductChip product={t.product} />
+                          {t.dueDate && (
+                            <span style={{ fontSize: 11, color: isOverdue(t.dueDate) ? COLORS.red : COLORS.textMuted }}>{formatDate(t.dueDate)}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -555,8 +625,16 @@ function WeeklyMeeting({ currentUser, meetings, setMeetings, updates, setUpdates
     setMeetings(prev => prev.map(m => m.id === selectedId ? { ...m, status: 'Active' } : m));
   }
 
-  const tabs = ['kpis', 'updates', 'needs', 'decisions'];
-  const tabLabels = { kpis: 'KPIs', updates: 'Updates', needs: 'Needs', decisions: 'Decisions' };
+  function deleteMeeting() {
+    if (!window.confirm(`Delete "${meeting.label}"? This cannot be undone.`)) return;
+    setMeetings(prev => prev.filter(m => m.id !== selectedId));
+    if (DB.isConfigured()) DB.deleteMeeting(selectedId).catch(console.error);
+    const remaining = meetings.filter(m => m.id !== selectedId);
+    setSelectedId(remaining[0]?.id || null);
+  }
+
+  const tabs = ['kpis', 'updates', 'needs', 'decisions', 'public-board'];
+  const tabLabels = { kpis: 'KPIs', updates: 'Updates', needs: 'Needs', decisions: 'Decisions', 'public-board': '🖥 Public Board' };
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -607,6 +685,7 @@ function WeeklyMeeting({ currentUser, meetings, setMeetings, updates, setUpdates
                   {meeting.status === 'Draft' && (
                     <Btn variant="primary" size="sm" onClick={markActive}>▶ Start Meeting</Btn>
                   )}
+                  <Btn variant="danger" size="sm" onClick={deleteMeeting}>🗑</Btn>
                 </div>
               </div>
 
@@ -629,11 +708,12 @@ function WeeklyMeeting({ currentUser, meetings, setMeetings, updates, setUpdates
 
             {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
-              {activeTab === 'kpis'      && <KPIsTab />}
-              {activeTab === 'updates'   && <UpdatesTab meetingId={meeting.id} currentUser={currentUser} updates={updates} setUpdates={setUpdates} />}
-              {activeTab === 'needs'     && <NeedsTab meetingId={meeting.id} currentUser={currentUser} needs={needs} setNeeds={setNeeds} />}
-              {activeTab === 'decisions' && <DecisionsTab meetingId={meeting.id} currentUser={currentUser} decisions={decisions} setDecisions={setDecisions} />}
-              <LinkedTasks meetingId={meeting.id} tasks={tasks} onNavigateBoard={onNavigateBoard} />
+              {activeTab === 'kpis'         && <KPIsTab />}
+              {activeTab === 'updates'      && <UpdatesTab meetingId={meeting.id} currentUser={currentUser} updates={updates} setUpdates={setUpdates} />}
+              {activeTab === 'needs'        && <NeedsTab meetingId={meeting.id} currentUser={currentUser} needs={needs} setNeeds={setNeeds} />}
+              {activeTab === 'decisions'    && <DecisionsTab meetingId={meeting.id} currentUser={currentUser} decisions={decisions} setDecisions={setDecisions} />}
+              {activeTab === 'public-board' && <PublicBoardTab meetingId={meeting.id} tasks={tasks} />}
+              {activeTab !== 'public-board' && <LinkedTasks meetingId={meeting.id} tasks={tasks} onNavigateBoard={onNavigateBoard} />}
             </div>
           </>
         )}
