@@ -7,6 +7,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.BGH_CONFIG = {
-  supabaseUrl: 'YOUR_SUPABASE_URL',   // e.g. https://abcdefghijkl.supabase.co
-  supabaseKey: 'YOUR_SUPABASE_ANON_KEY', // the long eyJ... anon/public key
+  supabaseUrl: 'https://usqwgrwosfckzjxynwpd.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzcXdncndvc2Zja3pqeHlud3BkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMDAzMTIsImV4cCI6MjA5Mjc3NjMxMn0.wJERRdKQwHPedFBRAcpMTHLeIWuyGHB-4ZJ9vHeoGAA',
 };
