@@ -256,6 +256,7 @@ async function testConnection() {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 function signIn(email, password)      { return _sb.auth.signInWithPassword({ email, password }); }
+function signUp(email, password)      { return _sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname } }); }
 function signOut()                    { return _sb.auth.signOut(); }
 function getSession()                 { return _sb.auth.getSession(); }
 function onAuthChange(cb)             { return _sb.auth.onAuthStateChange(cb); }
@@ -274,5 +275,5 @@ window.DB = {
   // converters exposed for import use
   meetingFromDB, taskFromDB, needFromDB, decisionFromDB, updatesFromDB,
   // auth
-  signIn, signOut, getSession, onAuthChange, resetPassword, updatePassword,
+  signIn, signUp, signOut, getSession, onAuthChange, resetPassword, updatePassword,
 };
