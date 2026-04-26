@@ -22,37 +22,32 @@ function Sidebar({ currentView, onNavigate, currentUser, onLogout, collapsed, on
     }}>
       {/* Logo */}
       <div style={{
-        padding: collapsed ? '20px 0' : '20px 16px',
+        padding: collapsed ? '14px 0' : '14px 12px',
         display: 'flex', alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
         minHeight: 64,
       }}>
         {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 9, background: COLORS.brand,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="2"/>
-                <circle cx="12" cy="12" r="4" fill="#fff"/>
-                <circle cx="12" cy="12" r="1.5" fill={COLORS.brand}/>
-              </svg>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+            {/* Three product logos in a row */}
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <BaimsLogo size={26} />
+              <OrcasLogo size={26} />
+              <MedMastersLogo size={26} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 14, color: '#fff', letterSpacing: '-0.2px' }}>Baims Hub</span>
+            {/* App name */}
+            <div style={{ lineHeight: 1.25 }}>
+              <div style={{ fontWeight: 800, fontSize: 12, color: '#fff', letterSpacing: '-0.2px' }}>Baims' Group</div>
+              <div style={{ fontWeight: 500, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Leadership Hub</div>
+            </div>
           </div>
         )}
         {collapsed && (
-          <div style={{
-            width: 32, height: 32, borderRadius: 9, background: COLORS.brand,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="4" fill="#fff"/>
-              <circle cx="12" cy="12" r="1.5" fill={COLORS.brand}/>
-            </svg>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+            <BaimsLogo size={22} />
+            <OrcasLogo size={22} />
+            <MedMastersLogo size={22} />
           </div>
         )}
         <button
@@ -60,7 +55,7 @@ function Sidebar({ currentView, onNavigate, currentUser, onLogout, collapsed, on
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: 'rgba(255,255,255,0.4)', padding: 4, borderRadius: 4,
-            display: 'flex', alignItems: 'center',
+            display: 'flex', alignItems: 'center', flexShrink: 0,
           }}
         >
           {collapsed ? '›' : '‹'}

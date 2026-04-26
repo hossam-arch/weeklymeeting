@@ -10,21 +10,15 @@ function Login({ onLogin }) {
       padding: 20,
     }}>
       {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: 14,
-          background: COLORS.brand,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="2"/>
-            <circle cx="12" cy="12" r="4" fill="#fff"/>
-            <circle cx="12" cy="12" r="1.5" fill={COLORS.brand}/>
-          </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginBottom: 36 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BaimsLogo size={52} />
+          <OrcasLogo size={52} />
+          <MedMastersLogo size={52} />
         </div>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 18, color: COLORS.textPrimary, letterSpacing: '-0.3px' }}>Baims Group</div>
-          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: -1 }}>Hub</div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 20, color: COLORS.textPrimary, letterSpacing: '-0.4px' }}>Baims' Group Leadership Hub</div>
+          <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 2 }}>Leadership workspace</div>
         </div>
       </div>
 

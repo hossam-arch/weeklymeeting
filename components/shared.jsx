@@ -481,3 +481,43 @@ window.Input = Input;
 window.Textarea = Textarea;
 window.Select = Select;
 window.EmptyState = EmptyState;
+
+// ─── PRODUCT LOGO SVGs ────────────────────────────────────────────────────────
+function BaimsLogo({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: size * 0.22, flexShrink: 0 }}>
+      <rect width="100" height="100" rx="22" fill="#1A9CE0"/>
+      {/* Open book — left page */}
+      <path d="M48 70 L48 46 L17 31 L15 54 Z" fill="white"/>
+      {/* Open book — right page */}
+      <path d="M52 70 L52 46 L83 31 L85 54 Z" fill="white"/>
+    </svg>
+  );
+}
+
+function OrcasLogo({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: size * 0.22, flexShrink: 0 }}>
+      <rect width="100" height="100" rx="22" fill="#62B8EA"/>
+      <circle cx="50" cy="50" r="7"  fill="white"/>
+      <circle cx="50" cy="50" r="17" fill="none" stroke="white" strokeWidth="5.5"/>
+      <circle cx="50" cy="50" r="28" fill="none" stroke="white" strokeWidth="5.5"/>
+      <circle cx="50" cy="50" r="39" fill="none" stroke="white" strokeWidth="5"/>
+    </svg>
+  );
+}
+
+function MedMastersLogo({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: size * 0.05, flexShrink: 0 }}>
+      <rect width="100" height="100" fill="#3DAF56"/>
+      <rect x="12" y="20" width="21" height="60" rx="10.5" fill="none" stroke="#F0EDD5" strokeWidth="5"/>
+      <rect x="39.5" y="20" width="21" height="60" rx="10.5" fill="none" stroke="#F0EDD5" strokeWidth="5"/>
+      <rect x="67" y="20" width="21" height="60" rx="10.5" fill="none" stroke="#F0EDD5" strokeWidth="5"/>
+    </svg>
+  );
+}
+
+window.BaimsLogo = BaimsLogo;
+window.OrcasLogo = OrcasLogo;
+window.MedMastersLogo = MedMastersLogo;
