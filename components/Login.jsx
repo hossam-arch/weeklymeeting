@@ -50,29 +50,16 @@ function Login({ mode: initialMode = 'pick' }) {
     e.preventDefault();
     if (!password) { setError('Please enter your password.'); return; }
     setLoading(true); clear();
-
     const { error } = await DB.signIn(selected.email, password);
-
-    if (!error) { setLoading(false); return; } // success — App.jsx handles session
-
-    if (error.message === 'Invalid login credentials') {
-      // Account may not exist yet — try to auto-create it on first login
-      const { data, error: signUpError } = await DB.signUp(selected.email, password);
-      if (signUpError) {
-        // "User already registered" means account exists but password is wrong
-        setError('Incorrect password. Use "Forgot password?" to reset it.');
-      } else if (data?.session) {
-        // Account created + immediately signed in (email confirmation disabled in Supabase)
-        // App.jsx onAuthChange handles the rest — nothing to do here
-      } else {
-        // Email confirmation is ON in Supabase — user must confirm before signing in
-        setError('Account created! Check your inbox for a confirmation email, then sign in.');
-      }
-    } else {
-      setError(error.message);
-    }
-
     setLoading(false);
+    if (error) setError(
+      error.message === 'Invalid login credentials'
+        ? 'Incorrect password. Use "Forgot password?" to reset it.'
+        : error.message === 'Email not confirmed'
+        ? 'Account not yet active — contact your admin to confirm your account.'
+        : error.message
+    );
+    // On success: App.jsx onAuthChange handles session
   }
 
   async function handleForgot(e) {
