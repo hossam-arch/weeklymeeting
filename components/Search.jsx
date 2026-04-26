@@ -5,9 +5,14 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [followUp, setFollowUp] = React.useState('');
-  const [apiKey, setApiKey] = React.useState(() => localStorage.getItem('bgh-api-key') || '');
-  const [showKeyInput, setShowKeyInput] = React.useState(false);
   const inputRef = React.useRef(null);
+
+  // Key comes from config.js (authoritative) — no user input needed
+  function getApiKey() {
+    const cfg = window.BGH_CONFIG?.anthropicKey;
+    if (cfg && cfg !== 'YOUR_ANTHROPIC_API_KEY') return cfg;
+    return null;
+  }
 
   const suggestions = [
     `What did ${currentUser.name} ask for this week?`,
@@ -76,8 +81,8 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
 
   async function search(q) {
     if (!q.trim()) return;
-    const key = apiKey.trim();
-    if (!key) { setShowKeyInput(true); return; }
+    const key = getApiKey();
+    if (!key) { setError('AI search is not configured. Ask your admin to add the Anthropic API key to config.js.'); return; }
 
     setLoading(true);
     setError(null);
@@ -115,12 +120,6 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
     }
   }
 
-  function saveKey(k) {
-    localStorage.setItem('bgh-api-key', k);
-    setApiKey(k);
-    setShowKeyInput(false);
-  }
-
   function reset() {
     setAnswer(null);
     setError(null);
@@ -133,25 +132,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
     <div style={{ height: '100vh', overflowY: 'auto', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px' }}>
       <div style={{ width: '100%', maxWidth: 720 }}>
 
-        {/* API key inline prompt */}
-        {showKeyInput && (
-          <div style={{ marginBottom: 24, padding: 16, background: COLORS.amberLight, border: `1px solid ${COLORS.amber}44`, borderRadius: 10 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: COLORS.textPrimary }}>Enter your Anthropic API key</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="password"
-                placeholder="sk-ant-..."
-                defaultValue={apiKey}
-                id="api-key-input"
-                style={{ flex: 1, padding: '8px 10px', borderRadius: 7, border: `1px solid ${COLORS.border}`, fontSize: 13, outline: 'none' }}
-              />
-              <Btn variant="primary" size="sm" onClick={() => saveKey(document.getElementById('api-key-input').value)}>Save</Btn>
-              <Btn size="sm" onClick={() => setShowKeyInput(false)}>Cancel</Btn>
-            </div>
-          </div>
-        )}
-
-        {!answer ? (
+          {!answer ? (
           <>
             {/* Hero */}
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -261,19 +242,14 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
         {error && (
           <div style={{ padding: 16, background: COLORS.redLight, border: `1px solid ${COLORS.red}44`, borderRadius: 10, color: COLORS.red, fontSize: 13, marginTop: 16 }}>
             <strong>Error:</strong> {error}
-            {error.includes('401') && (
-              <button onClick={() => setShowKeyInput(true)} style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', color: COLORS.brand, fontWeight: 600, fontSize: 13 }}>
-                Update API key
-              </button>
-            )}
           </div>
         )}
 
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 32, fontSize: 12, color: COLORS.textMuted }}>
-          {apiKey
-            ? <span>API key saved · <button onClick={() => setShowKeyInput(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLORS.brand, fontSize: 12, fontWeight: 600 }}>Change API key</button></span>
-            : <button onClick={() => setShowKeyInput(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLORS.brand, fontSize: 12, fontWeight: 600 }}>Add API key to enable search</button>
+          {getApiKey()
+            ? <span>AI search ready · powered by Claude</span>
+            : <span style={{ color: COLORS.amber }}>⚠ Add anthropicKey to config.js to enable search</span>
           }
         </div>
       </div>
