@@ -7,13 +7,6 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
   const [followUp, setFollowUp] = React.useState('');
   const inputRef = React.useRef(null);
 
-  // Key comes from config.js (authoritative) — no user input needed
-  function getApiKey() {
-    const cfg = window.BGH_CONFIG?.anthropicKey;
-    if (cfg && cfg !== 'YOUR_ANTHROPIC_API_KEY') return cfg;
-    return null;
-  }
-
   const suggestions = [
     `What did ${currentUser.name} ask for this week?`,
     'How is Orcas UAE performing?',
@@ -93,22 +86,14 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
 
   async function search(q) {
     if (!q.trim()) return;
-    const key = getApiKey();
-    if (!key) { setError('AI search is not configured. Ask your admin to add the Anthropic API key to config.js.'); return; }
-
     setLoading(true);
     setError(null);
     setAnswer(null);
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/search', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
@@ -259,10 +244,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
 
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 32, fontSize: 12, color: COLORS.textMuted }}>
-          {getApiKey()
-            ? <span>AI search ready · powered by Claude</span>
-            : <span style={{ color: COLORS.amber }}>⚠ Add anthropicKey to config.js to enable search</span>
-          }
+          <span>AI search · powered by Claude</span>
         </div>
       </div>
 
