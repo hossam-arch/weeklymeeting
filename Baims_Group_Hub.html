@@ -9,6 +9,9 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
   <!-- Babel standalone for JSX in browser -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
@@ -21,15 +24,12 @@
       color: #111827;
       -webkit-font-smoothing: antialiased;
     }
-    /* Custom scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
-    /* Remove default button/input styles */
     button { font-family: inherit; }
     input, textarea, select { font-family: inherit; }
-    /* Drag and drop cursor */
     [draggable="true"] { cursor: grab; }
     [draggable="true"]:active { cursor: grabbing; }
   </style>
@@ -41,15 +41,16 @@
     </div>
   </div>
 
-  <!-- Load components in dependency order -->
-  <!-- Each file exposes its exports via window globals -->
+  <!-- Load in dependency order — each file exposes exports via window globals -->
   <script type="text/babel" src="components/shared.jsx"        data-presets="react"></script>
+  <script type="text/babel" src="components/db.jsx"            data-presets="react"></script>
   <script type="text/babel" src="components/Login.jsx"         data-presets="react"></script>
   <script type="text/babel" src="components/Sidebar.jsx"       data-presets="react"></script>
   <script type="text/babel" src="components/WeeklyMeeting.jsx" data-presets="react"></script>
   <script type="text/babel" src="components/Boards.jsx"        data-presets="react"></script>
   <script type="text/babel" src="components/Dashboard.jsx"     data-presets="react"></script>
   <script type="text/babel" src="components/Search.jsx"        data-presets="react"></script>
+  <script type="text/babel" src="components/Setup.jsx"         data-presets="react"></script>
   <script type="text/babel" src="components/App.jsx"           data-presets="react"></script>
 </body>
 </html>

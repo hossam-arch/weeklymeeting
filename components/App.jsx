@@ -2,64 +2,173 @@
 function App() {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   const [currentUser, setCurrentUser] = React.useState(() => {
-    const saved = localStorage.getItem('bgh-user');
-    return saved ? JSON.parse(saved) : null;
+    const s = localStorage.getItem('bgh-user');
+    return s ? JSON.parse(s) : null;
   });
 
   // ── NAVIGATION ────────────────────────────────────────────────────────────
   const [view, setView] = React.useState('meeting');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
-  // ── STATE — shared across views ───────────────────────────────────────────
+  // ── SUPABASE INIT (run once at startup) ───────────────────────────────────
+  React.useEffect(() => {
+    const url = localStorage.getItem('bgh-sb-url');
+    const key = localStorage.getItem('bgh-sb-key');
+    if (url && key) DB.init(url, key);
+  }, []);
+
+  // ── SHARED STATE ──────────────────────────────────────────────────────────
   const [meetings, setMeetings] = React.useState(() => {
     const s = localStorage.getItem('bgh-meetings');
     return s ? JSON.parse(s) : MEETINGS_INIT;
   });
-
   const [tasks, setTasks] = React.useState(() => {
     const s = localStorage.getItem('bgh-tasks');
     return s ? JSON.parse(s) : TASKS_INIT;
   });
-
   const [needs, setNeeds] = React.useState(() => {
     const s = localStorage.getItem('bgh-needs');
     return s ? JSON.parse(s) : NEEDS_INIT;
   });
-
   const [decisions, setDecisions] = React.useState(() => {
     const s = localStorage.getItem('bgh-decisions');
     return s ? JSON.parse(s) : DECISIONS_INIT;
   });
-
   const [updates, setUpdates] = React.useState(() => {
     const s = localStorage.getItem('bgh-updates');
     return s ? JSON.parse(s) : UPDATES_INIT;
   });
 
-  // ── PERSISTENCE ───────────────────────────────────────────────────────────
-  React.useEffect(() => { localStorage.setItem('bgh-meetings',  JSON.stringify(meetings));  }, [meetings]);
-  React.useEffect(() => { localStorage.setItem('bgh-tasks',     JSON.stringify(tasks));     }, [tasks]);
-  React.useEffect(() => { localStorage.setItem('bgh-needs',     JSON.stringify(needs));     }, [needs]);
-  React.useEffect(() => { localStorage.setItem('bgh-decisions', JSON.stringify(decisions)); }, [decisions]);
-  React.useEffect(() => { localStorage.setItem('bgh-updates',   JSON.stringify(updates));   }, [updates]);
+  const [dbLoading, setDbLoading] = React.useState(false);
+
+  // ── LOAD FROM SUPABASE on mount (if configured) ───────────────────────────
+  React.useEffect(() => {
+    if (!DB.isConfigured()) return;
+    setDbLoading(true);
+    DB.fetchAll()
+      .then(data => {
+        if (data.meetings.length  > 0) setMeetings(data.meetings);
+        if (data.tasks.length     > 0) setTasks(data.tasks);
+        if (data.needs.length     > 0) setNeeds(data.needs);
+        if (data.decisions.length > 0) setDecisions(data.decisions);
+        if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
+      })
+      .catch(e => console.error('Supabase load:', e))
+      .finally(() => setDbLoading(false));
+  }, []);
+
+  // ── REALTIME SUBSCRIPTIONS ────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (!DB.isConfigured()) return;
+    const channel = DB.subscribe({
+      onTask: ({ eventType, new: n, old: o }) => {
+        if (eventType === 'DELETE') {
+          setTasks(prev => prev.filter(t => t.id !== o.id));
+        } else {
+          const t = DB.taskFromDB(n);
+          setTasks(prev => {
+            const filtered = prev.filter(x => x.id !== t.id);
+            return eventType === 'INSERT' ? [...filtered, t] : filtered.map(x => x.id === t.id ? t : x);
+          });
+        }
+      },
+      onNeed: ({ eventType, new: n, old: o }) => {
+        if (eventType === 'DELETE') {
+          setNeeds(prev => prev.filter(x => x.id !== o.id));
+        } else {
+          const item = DB.needFromDB(n);
+          setNeeds(prev => {
+            const f = prev.filter(x => x.id !== item.id);
+            return eventType === 'INSERT' ? [...f, item] : f.map(x => x.id === item.id ? item : x);
+          });
+        }
+      },
+      onDecision: ({ eventType, new: n }) => {
+        if (eventType !== 'DELETE') {
+          const d = DB.decisionFromDB(n);
+          setDecisions(prev => {
+            const f = prev.filter(x => x.id !== d.id);
+            return eventType === 'INSERT' ? [...f, d] : f.map(x => x.id === d.id ? d : x);
+          });
+        }
+      },
+      onMeeting: ({ eventType, new: n }) => {
+        if (eventType !== 'DELETE') {
+          const m = DB.meetingFromDB(n);
+          setMeetings(prev => {
+            const f = prev.filter(x => x.id !== m.id);
+            return eventType === 'INSERT' ? [m, ...f] : f.map(x => x.id === m.id ? m : x);
+          });
+        }
+      },
+      onUpdate: ({ new: n }) => {
+        if (!n) return;
+        setUpdates(prev => ({
+          ...prev,
+          [n.meeting_id]: {
+            ...(prev[n.meeting_id] || {}),
+            [n.user_id]: {
+              general: n.general || '', budget: n.budget || '',
+              needs: n.needs_text || '', launch: n.launch || '',
+              lastEdited: n.last_edited,
+            },
+          },
+        }));
+      },
+    });
+    return () => { channel && channel.unsubscribe && channel.unsubscribe(); };
+  }, []);
+
+  // ── PERSIST (localStorage + Supabase on every change) ────────────────────
+  React.useEffect(() => {
+    localStorage.setItem('bgh-meetings', JSON.stringify(meetings));
+    if (DB.isConfigured()) DB.syncMeetings(meetings).catch(console.error);
+  }, [meetings]);
+
+  React.useEffect(() => {
+    localStorage.setItem('bgh-tasks', JSON.stringify(tasks));
+    if (DB.isConfigured()) DB.syncTasks(tasks).catch(console.error);
+  }, [tasks]);
+
+  React.useEffect(() => {
+    localStorage.setItem('bgh-needs', JSON.stringify(needs));
+    if (DB.isConfigured()) DB.syncNeeds(needs).catch(console.error);
+  }, [needs]);
+
+  React.useEffect(() => {
+    localStorage.setItem('bgh-decisions', JSON.stringify(decisions));
+    if (DB.isConfigured()) DB.syncDecisions(decisions).catch(console.error);
+  }, [decisions]);
+
+  React.useEffect(() => {
+    localStorage.setItem('bgh-updates', JSON.stringify(updates));
+    if (DB.isConfigured()) DB.syncUpdates(updates).catch(console.error);
+  }, [updates]);
 
   // ── AUTH HANDLERS ─────────────────────────────────────────────────────────
   function handleLogin(member) {
     localStorage.setItem('bgh-user', JSON.stringify(member));
     setCurrentUser(member);
   }
-
   function handleLogout() {
     localStorage.removeItem('bgh-user');
     setCurrentUser(null);
   }
 
-  // ── RENDER ────────────────────────────────────────────────────────────────
-  if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
+  // Called by Setup after a successful import/migration to reload from Supabase
+  function reloadFromDB() {
+    if (!DB.isConfigured()) return;
+    DB.fetchAll().then(data => {
+      if (data.meetings.length  > 0) setMeetings(data.meetings);
+      if (data.tasks.length     > 0) setTasks(data.tasks);
+      if (data.needs.length     > 0) setNeeds(data.needs);
+      if (data.decisions.length > 0) setDecisions(data.decisions);
+      if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
+    }).catch(console.error);
   }
 
-  const sharedProps = { currentUser, tasks, setTasks, needs, setNeeds, decisions, setDecisions, updates, setUpdates, meetings, setMeetings };
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  if (!currentUser) return <Login onLogin={handleLogin} />;
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: COLORS.bg }}>
@@ -70,20 +179,36 @@ function App() {
         onLogout={handleLogout}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(v => !v)}
+        dbConnected={DB.isConfigured()}
       />
 
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {/* DB loading banner */}
+        {dbLoading && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+            background: COLORS.brand, color: '#fff',
+            padding: '6px 16px', fontSize: 12, fontWeight: 600, textAlign: 'center',
+          }}>
+            Loading data from Supabase…
+          </div>
+        )}
+
         {view === 'meeting' && (
           <WeeklyMeeting
-            {...sharedProps}
-            onNavigateBoard={(taskId) => setView('board')}
+            currentUser={currentUser}
+            meetings={meetings} setMeetings={setMeetings}
+            updates={updates}   setUpdates={setUpdates}
+            needs={needs}       setNeeds={setNeeds}
+            decisions={decisions} setDecisions={setDecisions}
+            tasks={tasks}
+            onNavigateBoard={() => setView('board')}
           />
         )}
         {view === 'board' && (
           <GroupBoard
             currentUser={currentUser}
-            tasks={tasks}
-            setTasks={setTasks}
+            tasks={tasks} setTasks={setTasks}
             meetings={meetings}
             onNavigate={setView}
           />
@@ -91,8 +216,7 @@ function App() {
         {view === 'my-board' && (
           <MyBoard
             currentUser={currentUser}
-            tasks={tasks}
-            setTasks={setTasks}
+            tasks={tasks} setTasks={setTasks}
             needs={needs}
             meetings={meetings}
           />
@@ -100,10 +224,8 @@ function App() {
         {view === 'dashboard' && (
           <Dashboard
             currentUser={currentUser}
-            tasks={tasks}
-            needs={needs}
-            decisions={decisions}
-            updates={updates}
+            tasks={tasks} needs={needs}
+            decisions={decisions} updates={updates}
             meetings={meetings}
             onNavigate={setView}
           />
@@ -111,18 +233,18 @@ function App() {
         {view === 'search' && (
           <Search
             currentUser={currentUser}
-            tasks={tasks}
-            needs={needs}
-            decisions={decisions}
-            updates={updates}
+            tasks={tasks} needs={needs}
+            decisions={decisions} updates={updates}
             meetings={meetings}
           />
+        )}
+        {view === 'setup' && (
+          <Setup onConnected={reloadFromDB} />
         )}
       </main>
     </div>
   );
 }
 
-// ── BOOT ─────────────────────────────────────────────────────────────────────
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
