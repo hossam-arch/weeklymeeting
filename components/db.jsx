@@ -254,6 +254,14 @@ async function testConnection() {
   return true;
 }
 
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+function signIn(email, password)      { return _sb.auth.signInWithPassword({ email, password }); }
+function signOut()                    { return _sb.auth.signOut(); }
+function getSession()                 { return _sb.auth.getSession(); }
+function onAuthChange(cb)             { return _sb.auth.onAuthStateChange(cb); }
+function resetPassword(email, url)    { return _sb.auth.resetPasswordForEmail(email, { redirectTo: url }); }
+function updatePassword(password)     { return _sb.auth.updateUser({ password }); }
+
 // Expose globally
 window.DB = {
   isConfigured, init,
@@ -265,4 +273,6 @@ window.DB = {
   testConnection,
   // converters exposed for import use
   meetingFromDB, taskFromDB, needFromDB, decisionFromDB, updatesFromDB,
+  // auth
+  signIn, signOut, getSession, onAuthChange, resetPassword, updatePassword,
 };

@@ -128,10 +128,31 @@ function Setup({ onConnected }) {
     a.click();
   }
 
+  // ── Provision users tab ────────────────────────────────────────────────────
+  const [provisionStatus, setProvisionStatus] = React.useState('idle');
+  const [provisionResults, setProvisionResults] = React.useState([]);
+
+  async function provisionUsers() {
+    if (!window.confirm('This will create all 7 team accounts with the default password "admin_access". Continue?')) return;
+    setProvisionStatus('running');
+    setProvisionResults([]);
+    try {
+      const res = await fetch('/api/provision-users', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) { setProvisionStatus('error'); setProvisionResults([{ error: data.error }]); return; }
+      setProvisionResults(data.results || []);
+      setProvisionStatus('done');
+    } catch (e) {
+      setProvisionStatus('error');
+      setProvisionResults([{ error: e.message }]);
+    }
+  }
+
   const tabs = [
-    { id: 'migrate', label: 'Migrate current data' },
-    { id: 'import',  label: 'Import historical meetings' },
-    { id: 'reset',   label: '⚠ Reset database' },
+    { id: 'migrate',  label: 'Migrate current data' },
+    { id: 'import',   label: 'Import historical meetings' },
+    { id: 'accounts', label: '👤 Team accounts' },
+    { id: 'reset',    label: '⚠ Reset database' },
   ];
 
   return (
@@ -338,6 +359,48 @@ function Setup({ onConnected }) {
             </Card>
           </div>
         )}
+        {/* ── TEAM ACCOUNTS ── */}
+        {tab === 'accounts' && (
+          <Card>
+            <h3 style={{ fontWeight: 700, fontSize: 15, color: COLORS.textPrimary, marginBottom: 8 }}>
+              👤 Provision Team Accounts
+            </h3>
+            <p style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 8 }}>
+              Creates all 7 team accounts in Supabase Auth with the default password <code style={{ background: COLORS.grayLight, padding: '1px 5px', borderRadius: 4 }}>admin_access</code>.
+              Accounts that already exist will be skipped. Requires <strong>SUPABASE_SERVICE_KEY</strong> set in Vercel environment variables.
+            </p>
+            <p style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16 }}>
+              After provisioning, users can sign in and use "Forgot password" to set their own password.
+            </p>
+
+            {provisionResults.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                {provisionResults.map((r, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '7px 12px', borderRadius: 7, marginBottom: 4,
+                    background: r.ok ? COLORS.greenLight : r.error ? COLORS.redLight : COLORS.grayLight,
+                    fontSize: 13,
+                  }}>
+                    <span style={{ fontWeight: 500 }}>{r.email || r.error}</span>
+                    <span style={{ color: r.ok ? COLORS.green : COLORS.red }}>
+                      {r.ok ? '✓ created' : r.error || 'failed'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Btn
+              variant="primary"
+              onClick={provisionUsers}
+              disabled={provisionStatus === 'running'}
+            >
+              {provisionStatus === 'running' ? 'Creating accounts…' : '👤 Create all team accounts'}
+            </Btn>
+          </Card>
+        )}
+
         {/* ── RESET ── */}
         {tab === 'reset' && (
           <Card style={{ border: `1.5px solid ${COLORS.red}44` }}>

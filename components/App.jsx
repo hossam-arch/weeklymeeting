@@ -1,10 +1,51 @@
 
 function App() {
   // ── AUTH ──────────────────────────────────────────────────────────────────
-  const [currentUser, setCurrentUser] = React.useState(() => {
-    const s = localStorage.getItem('bgh-user');
-    return s ? JSON.parse(s) : null;
-  });
+  // 'loading' while checking session, 'login', 'recovery' (password reset), 'app'
+  const [authMode, setAuthMode]       = React.useState('loading');
+  const [currentUser, setCurrentUser] = React.useState(null);
+  const inRecoveryRef                 = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!DB.isConfigured()) { setAuthMode('login'); return; }
+
+    // Check for an existing session on page load
+    DB.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const member = TEAM.find(m => m.email === session.user.email);
+        if (member) { setCurrentUser(member); setAuthMode('app'); }
+        else { setAuthMode('login'); }
+      } else {
+        setAuthMode('login');
+      }
+    });
+
+    // React to auth events (sign-in, sign-out, password recovery)
+    const { data: { subscription } } = DB.onAuthChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        inRecoveryRef.current = true;
+        setAuthMode('recovery');
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        if (!inRecoveryRef.current) {
+          const member = TEAM.find(m => m.email === session.user.email);
+          if (member) { setCurrentUser(member); setAuthMode('app'); }
+          else { DB.signOut(); setAuthMode('login'); }
+        }
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        // After password reset the user is signed in — route to app
+        inRecoveryRef.current = false;
+        const member = TEAM.find(m => m.email === session.user.email);
+        if (member) { setCurrentUser(member); setAuthMode('app'); }
+        else { DB.signOut(); setAuthMode('login'); }
+      } else if (event === 'SIGNED_OUT') {
+        inRecoveryRef.current = false;
+        setCurrentUser(null);
+        setAuthMode('login');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ── NAVIGATION ────────────────────────────────────────────────────────────
   const [view, setView] = React.useState('meeting');
@@ -157,13 +198,9 @@ function App() {
   }, [updates]);
 
   // ── AUTH HANDLERS ─────────────────────────────────────────────────────────
-  function handleLogin(member) {
-    localStorage.setItem('bgh-user', JSON.stringify(member));
-    setCurrentUser(member);
-  }
-  function handleLogout() {
-    localStorage.removeItem('bgh-user');
-    setCurrentUser(null);
+  async function handleLogout() {
+    await DB.signOut();
+    // onAuthChange handles clearing currentUser and authMode
   }
 
   // Called by Setup after a successful import/migration to reload from Supabase
@@ -179,7 +216,13 @@ function App() {
   }
 
   // ── RENDER ────────────────────────────────────────────────────────────────
-  if (!currentUser) return <Login onLogin={handleLogin} />;
+  if (authMode === 'loading') return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color: COLORS.textSecondary, fontSize: 14 }}>
+      Loading…
+    </div>
+  );
+  if (authMode === 'login')    return <Login mode="login" />;
+  if (authMode === 'recovery') return <Login mode="reset" />;
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: COLORS.bg }}>
