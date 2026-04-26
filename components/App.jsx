@@ -221,7 +221,7 @@ function App() {
       Loading…
     </div>
   );
-  if (authMode === 'login')    return <Login mode="login" />;
+  if (authMode === 'login')    return <Login mode="pick" />;
   if (authMode === 'recovery') return <Login mode="reset" />;
 
   return (
