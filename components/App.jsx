@@ -10,12 +10,7 @@ function App() {
   const [view, setView] = React.useState('meeting');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
-  // ── SUPABASE INIT (run once at startup) ───────────────────────────────────
-  React.useEffect(() => {
-    const url = localStorage.getItem('bgh-sb-url');
-    const key = localStorage.getItem('bgh-sb-key');
-    if (url && key) DB.init(url, key);
-  }, []);
+  // Supabase is auto-initialised from config.js when db.jsx loads.
 
   // ── SHARED STATE ──────────────────────────────────────────────────────────
   const [meetings, setMeetings] = React.useState(() => {

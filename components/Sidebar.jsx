@@ -8,7 +8,7 @@ function Sidebar({ currentView, onNavigate, currentUser, onLogout, collapsed, on
     { id: 'my-board',  label: 'My Board',  icon: NavMyBoardIcon },
     { id: 'dashboard', label: 'Dashboard', icon: NavDashIcon },
     { id: 'search',    label: 'Search',    icon: NavSearchIcon },
-    { id: 'setup',     label: 'DB Setup',  icon: NavSetupIcon },
+    { id: 'setup',     label: 'Import',    icon: NavSetupIcon },
   ];
 
   const W = collapsed ? 60 : 192;

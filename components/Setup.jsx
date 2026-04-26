@@ -1,85 +1,85 @@
 
-// ─── TEMPLATE for importing a historical meeting ─────────────────────────────
-const IMPORT_TEMPLATE = {
-  meeting: {
-    label: "Week 14",
-    dateRange: "Mar 31 – Apr 6, 2026",
-    startDate: "2026-03-31",
-    endDate: "2026-04-06",
-    chairmanId: "bader",
-    status: "Complete",
-    targetDuration: 90,
-    actualDuration: 82,
-  },
-  updates: {
-    shams:  { general: "Launched Ramadan campaign.", budget: "Within Q1 budget.", needs: "", launch: "Orcas Kuwait Q1 wrap-up." },
-    amira:  { general: "Tutor network grew 8%.", budget: "On track.", needs: "", launch: "UAE soft launch prep." },
-    yousef: { general: "Investor deck v3 sent.", budget: "Opex on target.", needs: "", launch: "Series A prep started." },
-    ahmad:  { general: "March best month for Baims Kuwait.", budget: "CAC improving.", needs: "", launch: "GUST deal signed." },
-    bader:  { general: "Sprint 12 complete.", budget: "Tool costs stable.", needs: "", launch: "Session replay scoped." },
-    hossam: { general: "AWS migration 70% done.", budget: "Infra costs down.", needs: "", launch: "Metabase POC ready." },
-    khalaf: { general: "20 tickets closed.", budget: "Dev tools on track.", needs: "", launch: "CI/CD improvements shipped." },
-  },
-  tasks: [
-    { title: "Finalize GUST integration spec", ownerId: "ahmad", product: "Baims", quadrant: "do-first", dueDate: "2026-04-07", status: "complete" },
-    { title: "Deploy Ramadan campaign assets", ownerId: "shams", product: "Orcas", quadrant: "do-first", dueDate: "2026-04-01", status: "complete" },
-  ],
-  needs: [
-    { fromId: "bader", toId: "khalaf", description: "Review session replay backend spec", status: "done", product: "Orcas" },
-  ],
-  decisions: [
-    { topic: "Proceed with GUST partnership", ownerId: "yousef", relevantIds: ["yousef", "ahmad"], status: "approved", outcome: "Approved. Ahmad to lead onboarding.", notes: "" },
-  ],
-};
+const IMPORT_TEMPLATE = [
+  {
+    meeting: {
+      label: "Week 14",
+      dateRange: "Mar 31 – Apr 6, 2026",
+      startDate: "2026-03-31",
+      endDate: "2026-04-06",
+      chairmanId: "bader",
+      status: "Complete",
+      targetDuration: 90,
+      actualDuration: 82,
+    },
+    updates: {
+      shams:  { general: "Launched Ramadan campaign.", budget: "Within Q1 budget.", needs: "", launch: "Orcas Kuwait Q1 wrap-up." },
+      amira:  { general: "Tutor network grew 8%.", budget: "On track.", needs: "", launch: "UAE soft launch prep." },
+      yousef: { general: "Investor deck v3 sent.", budget: "Opex on target.", needs: "", launch: "Series A prep started." },
+      ahmad:  { general: "March best month for Baims Kuwait.", budget: "CAC improving.", needs: "", launch: "GUST deal signed." },
+      bader:  { general: "Sprint 12 complete.", budget: "Tool costs stable.", needs: "", launch: "Session replay scoped." },
+      hossam: { general: "AWS migration 70% done.", budget: "Infra costs down.", needs: "", launch: "Metabase POC ready." },
+      khalaf: { general: "20 tickets closed.", budget: "Dev tools on track.", needs: "", launch: "CI/CD improvements shipped." },
+    },
+    tasks: [
+      { title: "Finalize GUST integration spec", ownerId: "ahmad", product: "Baims", quadrant: "do-first", dueDate: "2026-04-07", status: "complete" },
+      { title: "Deploy Ramadan campaign assets", ownerId: "shams", product: "Orcas", quadrant: "do-first", dueDate: "2026-04-01", status: "complete" },
+    ],
+    needs: [
+      { fromId: "bader", toId: "khalaf", description: "Review session replay backend spec", status: "done", product: "Orcas" },
+    ],
+    decisions: [
+      { topic: "Proceed with GUST partnership", ownerId: "yousef", relevantIds: ["yousef", "ahmad"], status: "approved", outcome: "Approved. Ahmad to lead onboarding.", notes: "" },
+    ],
+  }
+];
 
-// ─── SETUP / IMPORT SCREEN ────────────────────────────────────────────────────
 function Setup({ onConnected }) {
-  // ── Tab state ─────────────────────────────────────────────────────────────
-  const [tab, setTab] = React.useState('connect'); // 'connect' | 'import' | 'migrate'
+  const [tab, setTab] = React.useState('migrate');
 
-  // ── Connect tab ──────────────────────────────────────────────────────────
-  const [url,    setUrl]    = React.useState(() => localStorage.getItem('bgh-sb-url')  || '');
-  const [key,    setKey]    = React.useState(() => localStorage.getItem('bgh-sb-key')  || '');
-  const [status, setStatus] = React.useState(DB.isConfigured() ? 'connected' : 'idle'); // idle | testing | connected | error
-  const [statusMsg, setStatusMsg] = React.useState('');
+  // ── DB status ─────────────────────────────────────────────────────────────
+  const connected = DB.isConfigured();
 
-  async function connect() {
-    if (!url.trim() || !key.trim()) return;
-    setStatus('testing'); setStatusMsg('');
+  // ── Migrate tab ──────────────────────────────────────────────────────────
+  const [migrateStatus, setMigrateStatus] = React.useState('idle');
+  const [migrateMsg,    setMigrateMsg]    = React.useState('');
+
+  async function migrateFromLocalStorage() {
+    setMigrateStatus('running'); setMigrateMsg('');
     try {
-      DB.init(url.trim(), key.trim());
-      await DB.testConnection();
-      localStorage.setItem('bgh-sb-url', url.trim());
-      localStorage.setItem('bgh-sb-key', key.trim());
-      setStatus('connected');
-      setStatusMsg('Connected successfully!');
+      const meetings  = JSON.parse(localStorage.getItem('bgh-meetings')  || '[]');
+      const tasks     = JSON.parse(localStorage.getItem('bgh-tasks')     || '[]');
+      const needs     = JSON.parse(localStorage.getItem('bgh-needs')     || '[]');
+      const decisions = JSON.parse(localStorage.getItem('bgh-decisions') || '[]');
+      const updates   = JSON.parse(localStorage.getItem('bgh-updates')   || '{}');
+      await DB.syncMeetings(meetings);
+      await DB.syncTasks(tasks);
+      await DB.syncNeeds(needs);
+      await DB.syncDecisions(decisions);
+      await DB.syncUpdates(updates);
+      setMigrateStatus('done');
+      setMigrateMsg(`Migrated ${meetings.length} meetings, ${tasks.length} tasks, ${needs.length} needs, ${decisions.length} decisions.`);
+      if (onConnected) onConnected();
     } catch (e) {
-      setStatus('error');
-      setStatusMsg(e.message || 'Connection failed. Check your URL and key.');
+      setMigrateStatus('error');
+      setMigrateMsg(e.message || 'Migration failed.');
     }
   }
 
-  function disconnect() {
-    localStorage.removeItem('bgh-sb-url');
-    localStorage.removeItem('bgh-sb-key');
-    setStatus('idle'); setUrl(''); setKey('');
-  }
-
   // ── Import tab ───────────────────────────────────────────────────────────
-  const [importJson,   setImportJson]   = React.useState('');
-  const [importStatus, setImportStatus] = React.useState('idle'); // idle | running | done | error
-  const [importMsg,    setImportMsg]    = React.useState('');
+  const [importJson,    setImportJson]    = React.useState('');
+  const [importStatus,  setImportStatus]  = React.useState('idle');
+  const [importMsg,     setImportMsg]     = React.useState('');
   const [importResults, setImportResults] = React.useState([]);
 
   async function runImport() {
-    if (!DB.isConfigured()) { setImportMsg('Connect to Supabase first.'); setImportStatus('error'); return; }
+    if (!connected) { setImportMsg('Database not connected. Check config.js.'); setImportStatus('error'); return; }
     let bundles;
     try {
       const parsed = JSON.parse(importJson.trim());
       bundles = Array.isArray(parsed) ? parsed : [parsed];
     } catch {
       setImportStatus('error');
-      setImportMsg('Invalid JSON. Check the format matches the template.');
+      setImportMsg('Invalid JSON — check the format matches the template.');
       return;
     }
     setImportStatus('running'); setImportMsg(''); setImportResults([]);
@@ -102,48 +102,16 @@ function Setup({ onConnected }) {
   }
 
   function downloadTemplate() {
-    const json = JSON.stringify([IMPORT_TEMPLATE], null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(IMPORT_TEMPLATE, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'bgh-import-template.json';
     a.click();
   }
 
-  // ── Migrate tab ──────────────────────────────────────────────────────────
-  const [migrateStatus, setMigrateStatus] = React.useState('idle');
-  const [migrateMsg,    setMigrateMsg]    = React.useState('');
-
-  async function migrateFromLocalStorage() {
-    if (!DB.isConfigured()) { setMigrateMsg('Connect to Supabase first.'); setMigrateStatus('error'); return; }
-    setMigrateStatus('running'); setMigrateMsg('');
-    try {
-      const meetings  = JSON.parse(localStorage.getItem('bgh-meetings')  || '[]');
-      const tasks     = JSON.parse(localStorage.getItem('bgh-tasks')     || '[]');
-      const needs     = JSON.parse(localStorage.getItem('bgh-needs')     || '[]');
-      const decisions = JSON.parse(localStorage.getItem('bgh-decisions') || '[]');
-      const updates   = JSON.parse(localStorage.getItem('bgh-updates')   || '{}');
-
-      await DB.syncMeetings(meetings);
-      await DB.syncTasks(tasks);
-      await DB.syncNeeds(needs);
-      await DB.syncDecisions(decisions);
-      await DB.syncUpdates(updates);
-
-      setMigrateStatus('done');
-      setMigrateMsg(`Migrated ${meetings.length} meetings, ${tasks.length} tasks, ${needs.length} needs, ${decisions.length} decisions.`);
-      if (onConnected) onConnected();
-    } catch (e) {
-      setMigrateStatus('error');
-      setMigrateMsg(e.message || 'Migration failed.');
-    }
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
   const tabs = [
-    { id: 'connect', label: '① Connect' },
-    { id: 'migrate', label: '② Migrate current data' },
-    { id: 'import',  label: '③ Import historical meetings' },
+    { id: 'migrate', label: 'Migrate current data' },
+    { id: 'import',  label: 'Import historical meetings' },
   ];
 
   return (
@@ -151,17 +119,30 @@ function Setup({ onConnected }) {
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontWeight: 800, fontSize: 22, color: COLORS.textPrimary, marginBottom: 4 }}>
-            Database Setup
+            Data Management
           </h1>
           <p style={{ fontSize: 14, color: COLORS.textSecondary }}>
-            Connect to Supabase to share data across the team in real-time, then migrate or import meeting history.
+            Migrate existing browser data or import historical meetings into the shared database.
           </p>
         </div>
 
+        {/* DB status pill */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '6px 14px', borderRadius: 20, marginBottom: 24,
+          background: connected ? COLORS.greenLight : COLORS.redLight,
+          border: `1px solid ${connected ? COLORS.green : COLORS.red}44`,
+        }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: connected ? COLORS.green : COLORS.red }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: connected ? COLORS.green : COLORS.red }}>
+            {connected ? 'Database connected' : 'Database not connected — update config.js'}
+          </span>
+        </div>
+
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: `1px solid ${COLORS.border}` }}>
+        <div style={{ display: 'flex', borderBottom: `1px solid ${COLORS.border}`, marginBottom: 24 }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: '9px 18px', border: 'none', background: 'none', cursor: 'pointer',
@@ -175,92 +156,33 @@ function Setup({ onConnected }) {
           ))}
         </div>
 
-        {/* ── CONNECT TAB ── */}
-        {tab === 'connect' && (
-          <Card>
-            {status === 'connected' ? (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <span style={{ fontSize: 22 }}>✅</span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: COLORS.green }}>Connected to Supabase</div>
-                    <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{url}</div>
-                  </div>
-                </div>
-                <Btn size="sm" onClick={disconnect}>Disconnect</Btn>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <p style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.6 }}>
-                  Get these from your Supabase project: <strong>Dashboard → Settings → API</strong>
-                </p>
-                <Input
-                  label="Project URL"
-                  value={url}
-                  onChange={setUrl}
-                  placeholder="https://xxxxxxxxxxxx.supabase.co"
-                />
-                <Input
-                  label="Anon / Public Key"
-                  type="password"
-                  value={key}
-                  onChange={setKey}
-                  placeholder="eyJhbGciOiJIUzI1NiIs..."
-                />
-                {statusMsg && (
-                  <div style={{
-                    padding: '10px 14px', borderRadius: 8, fontSize: 13,
-                    background: status === 'error' ? COLORS.redLight : COLORS.greenLight,
-                    color: status === 'error' ? COLORS.red : COLORS.green,
-                    border: `1px solid ${status === 'error' ? COLORS.red : COLORS.green}44`,
-                  }}>
-                    {statusMsg}
-                  </div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4 }}>
-                  <Btn variant="primary" onClick={connect} disabled={!url.trim() || !key.trim() || status === 'testing'}>
-                    {status === 'testing' ? 'Testing…' : 'Connect & Test'}
-                  </Btn>
-                  <span style={{ fontSize: 12, color: COLORS.textMuted }}>
-                    Credentials are stored in your browser only.
-                  </span>
-                </div>
-
-                {/* Schema reminder */}
-                <div style={{ marginTop: 8, padding: '12px 16px', background: COLORS.amberLight, borderRadius: 8, border: `1px solid ${COLORS.amber}44` }}>
-                  <div style={{ fontWeight: 700, fontSize: 12, color: COLORS.amber, marginBottom: 4 }}>Before connecting</div>
-                  <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
-                    Run <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace' }}>supabase-schema.sql</code> in your Supabase SQL Editor first.
-                    The file is in the project root — open it and paste the full contents into
-                    <strong> Supabase Dashboard → SQL Editor → New query → Run</strong>.
-                  </div>
-                </div>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* ── MIGRATE TAB ── */}
+        {/* ── MIGRATE ── */}
         {tab === 'migrate' && (
           <Card>
-            <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Migrate current browser data → Supabase</h3>
+            <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
+              Push this browser's data → Supabase
+            </h3>
             <p style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 16 }}>
-              Pushes everything currently in your browser's localStorage (all meetings, tasks, needs, decisions,
-              and member updates) into Supabase. Do this once after connecting — it makes your existing
-              data available to the whole team.
+              Uploads everything currently saved in your browser (meetings, tasks, needs, decisions,
+              member updates) to the shared database. Run this once on the first device you set up.
             </p>
             <div style={{ marginBottom: 16 }}>
-              {['bgh-meetings','bgh-tasks','bgh-needs','bgh-decisions','bgh-updates'].map(key => {
+              {[
+                { key: 'bgh-meetings',  label: 'Meetings' },
+                { key: 'bgh-tasks',     label: 'Tasks' },
+                { key: 'bgh-needs',     label: 'Needs' },
+                { key: 'bgh-decisions', label: 'Decisions' },
+                { key: 'bgh-updates',   label: 'Update rows' },
+              ].map(({ key, label }) => {
                 const raw = localStorage.getItem(key);
                 const count = raw
                   ? (key === 'bgh-updates'
                       ? Object.values(JSON.parse(raw)).reduce((s, v) => s + Object.keys(v).length, 0)
                       : JSON.parse(raw).length)
                   : 0;
-                const labels = { 'bgh-meetings':'Meetings','bgh-tasks':'Tasks','bgh-needs':'Needs','bgh-decisions':'Decisions','bgh-updates':'Update rows' };
                 return (
                   <div key={key} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:`1px solid ${COLORS.borderLight}`, fontSize:13 }}>
-                    <span style={{ color: COLORS.textSecondary }}>{labels[key]}</span>
+                    <span style={{ color: COLORS.textSecondary }}>{label}</span>
                     <strong>{count}</strong>
                   </div>
                 );
@@ -279,17 +201,14 @@ function Setup({ onConnected }) {
             <Btn
               variant="primary"
               onClick={migrateFromLocalStorage}
-              disabled={!DB.isConfigured() || migrateStatus === 'running'}
+              disabled={!connected || migrateStatus === 'running'}
             >
-              {migrateStatus === 'running' ? 'Migrating…' : '⬆ Push to Supabase'}
+              {migrateStatus === 'running' ? 'Migrating…' : '⬆ Push to database'}
             </Btn>
-            {!DB.isConfigured() && (
-              <span style={{ fontSize: 12, color: COLORS.amber, marginLeft: 12 }}>Connect to Supabase first (tab ①)</span>
-            )}
           </Card>
         )}
 
-        {/* ── IMPORT TAB ── */}
+        {/* ── IMPORT ── */}
         {tab === 'import' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Card>
@@ -298,19 +217,16 @@ function Setup({ onConnected }) {
                 <Btn size="sm" onClick={downloadTemplate}>⬇ Download template</Btn>
               </div>
               <p style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 14 }}>
-                Paste a JSON array of meeting bundles below. Each bundle includes one meeting record plus
-                its updates, tasks, needs, and decisions. You can import multiple meetings at once.
-                Download the template to see the exact expected format.
+                Paste a JSON array of past meeting bundles. Each bundle includes the meeting plus
+                its member updates, tasks, needs, and decisions. Multiple meetings can be imported at once.
               </p>
-
               <Textarea
                 label="Paste JSON here"
                 value={importJson}
                 onChange={setImportJson}
-                placeholder={'[\n  {\n    "meeting": { "label": "Week 14", "status": "Complete", ... },\n    "updates": { "shams": { "general": "...", ... }, ... },\n    "tasks": [...],\n    "needs": [...],\n    "decisions": [...]\n  }\n]'}
+                placeholder={'[\n  {\n    "meeting": { "label": "Week 14", ... },\n    "updates": { "shams": { ... }, ... },\n    "tasks": [...],\n    "needs": [...],\n    "decisions": [...]\n  }\n]'}
                 rows={12}
               />
-
               {importMsg && (
                 <div style={{
                   padding: '10px 14px', borderRadius: 8, fontSize: 13, marginTop: 12,
@@ -321,7 +237,6 @@ function Setup({ onConnected }) {
                   {importMsg}
                 </div>
               )}
-
               {importResults.length > 0 && (
                 <div style={{ marginTop: 10 }}>
                   {importResults.map((r, i) => (
@@ -333,57 +248,49 @@ function Setup({ onConnected }) {
                   ))}
                 </div>
               )}
-
               <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
-                <Btn
-                  variant="primary"
-                  onClick={runImport}
-                  disabled={!importJson.trim() || importStatus === 'running'}
-                >
-                  {importStatus === 'running' ? 'Importing…' : '⬆ Import to Supabase'}
+                <Btn variant="primary" onClick={runImport} disabled={!importJson.trim() || importStatus === 'running'}>
+                  {importStatus === 'running' ? 'Importing…' : '⬆ Import to database'}
                 </Btn>
                 <Btn size="sm" onClick={() => { setImportJson(''); setImportStatus('idle'); setImportMsg(''); setImportResults([]); }}>
                   Clear
                 </Btn>
               </div>
-              {!DB.isConfigured() && (
-                <div style={{ marginTop: 10, fontSize: 12, color: COLORS.amber }}>Connect to Supabase first (tab ①)</div>
-              )}
             </Card>
 
             {/* Format reference */}
             <Card style={{ background: COLORS.grayLight }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>JSON format reference</div>
-              <div style={{ fontFamily: 'monospace', fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-{`[
+              <pre style={{ fontFamily: 'monospace', fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{
+`[
   {
     "meeting": {
-      "label":          "Week 14",            // required
+      "label":          "Week 14",
       "dateRange":      "Mar 31 – Apr 6, 2026",
       "startDate":      "2026-03-31",
       "endDate":        "2026-04-06",
-      "chairmanId":     "yousef",             // team member id
-      "status":         "Complete",           // Draft | Active | Complete
+      "chairmanId":     "yousef",      // shams|amira|yousef|ahmad|bader|hossam|khalaf
+      "status":         "Complete",   // Draft | Active | Complete
       "targetDuration": 90,
       "actualDuration": 82
     },
     "updates": {
       "shams":  { "general": "...", "budget": "...", "needs": "", "launch": "..." },
-      "amira":  { ... },   // one key per team member id
-      "yousef": { ... },   // all fields optional
-      "ahmad":  { ... },
-      "bader":  { ... },
-      "hossam": { ... },
-      "khalaf": { ... }
+      "amira":  { "general": "...", "budget": "...", "needs": "", "launch": "..." },
+      "yousef": { "general": "...", "budget": "...", "needs": "", "launch": "..." },
+      "ahmad":  { "general": "...", "budget": "...", "needs": "", "launch": "..." },
+      "bader":  { "general": "...", "budget": "...", "needs": "", "launch": "..." },
+      "hossam": { "general": "...", "budget": "...", "needs": "", "launch": "..." },
+      "khalaf": { "general": "...", "budget": "...", "needs": "", "launch": "..." }
     },
     "tasks": [
       {
         "title":    "Fix login bug",
-        "ownerId":  "khalaf",                 // team member id
-        "product":  "Orcas",                  // Orcas | Baims | MedMasters | Group
-        "quadrant": "do-first",               // do-first | schedule | delegate | eliminate
+        "ownerId":  "khalaf",
+        "product":  "Orcas",          // Orcas | Baims | MedMasters | Group
+        "quadrant": "do-first",       // do-first | schedule | delegate | eliminate
         "dueDate":  "2026-04-05",
-        "status":   "complete"                // active | complete
+        "status":   "complete"        // active | complete
       }
     ],
     "needs": [
@@ -391,7 +298,7 @@ function Setup({ onConnected }) {
         "fromId":      "shams",
         "toId":        "yousef",
         "description": "Approve Q2 budget",
-        "status":      "done",               // pending | in-progress | done
+        "status":      "done",        // pending | in-progress | done
         "product":     "Group"
       }
     ],
@@ -400,14 +307,14 @@ function Setup({ onConnected }) {
         "topic":       "Launch UAE market",
         "ownerId":     "yousef",
         "relevantIds": ["yousef", "amira"],
-        "status":      "approved",            // open | approved | deferred
+        "status":      "approved",    // open | approved | deferred
         "outcome":     "Approved for May.",
         "notes":       ""
       }
     ]
   }
 ]`}
-              </div>
+              </pre>
             </Card>
           </div>
         )}

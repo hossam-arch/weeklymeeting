@@ -9,6 +9,14 @@ function init(url, key) {
   return _sb;
 }
 
+// Auto-initialise from config.js (runs immediately when this file loads)
+;(function autoInit() {
+  const cfg = window.BGH_CONFIG;
+  if (cfg && cfg.supabaseUrl && cfg.supabaseUrl !== 'YOUR_SUPABASE_URL') {
+    init(cfg.supabaseUrl, cfg.supabaseKey);
+  }
+})();
+
 // ─── SNAKE ↔ CAMEL CONVERTERS ────────────────────────────────────────────────
 function meetingFromDB(r) {
   return { id: r.id, label: r.label, dateRange: r.date_range, startDate: r.start_date,
