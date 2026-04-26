@@ -260,7 +260,8 @@ function NeedsTab({ meetingId, currentUser, needs, setNeeds }) {
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({ toId: TEAM[0].id, description: '', dueDate: '', product: 'Group' });
 
-  const meetingNeeds = needs.filter(n => n.meetingId === meetingId);
+  // Show this meeting's needs + any unresolved needs from other meetings (carry-over)
+  const meetingNeeds = needs.filter(n => n.meetingId === meetingId || n.status !== 'done');
 
   function addNeed() {
     if (!form.description.trim()) return;
@@ -366,7 +367,8 @@ function DecisionsTab({ meetingId, currentUser, decisions, setDecisions }) {
   const [expanded, setExpanded] = React.useState(null);
   const [form, setForm] = React.useState({ topic: '', ownerId: currentUser.id, relevantIds: [], notes: '' });
 
-  const meetingDecisions = decisions.filter(d => d.meetingId === meetingId);
+  // Show this meeting's decisions + any open decisions from other meetings (carry-over)
+  const meetingDecisions = decisions.filter(d => d.meetingId === meetingId || d.status === 'open');
 
   function addDecision() {
     if (!form.topic.trim()) return;

@@ -157,7 +157,7 @@ function TaskPanel({ task, currentUser, onSave, onClose, onComplete, onDelete, m
 }
 
 // ─── TASK CARD ────────────────────────────────────────────────────────────────
-function TaskCard({ task, currentUser, onClick, isDragging, onDragStart, onDragEnd }) {
+function TaskCard({ task, currentUser, onClick, isDragging, onDragStart, onDragEnd, showBadge = true }) {
   const owner = getTeamMember(task.ownerId);
   const isPrivate = task.isPrivate;
   const isOwn = task.ownerId === currentUser.id;
@@ -192,14 +192,16 @@ function TaskCard({ task, currentUser, onClick, isDragging, onDragStart, onDragE
         }}>
           {task.title}
         </span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, flexShrink: 0,
-          padding: '2px 6px', borderRadius: 4,
-          background: isPrivate ? '#FEF2F2' : '#EFF6FF',
-          color: isPrivate ? COLORS.red : COLORS.blue,
-        }}>
-          {isPrivate ? '🔒 Private' : '🌐 Public'}
-        </span>
+        {showBadge && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, flexShrink: 0,
+            padding: '2px 6px', borderRadius: 4,
+            background: isPrivate ? '#FEF2F2' : '#EFF6FF',
+            color: isPrivate ? COLORS.red : COLORS.blue,
+          }}>
+            {isPrivate ? '🔒 Private' : '🌐 Public'}
+          </span>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
         <Avatar memberId={task.ownerId} size={18} />
@@ -470,46 +472,106 @@ function GroupBoard({ currentUser, tasks, setTasks, meetings, onNavigate }) {
 }
 
 // ─── MY BOARD ─────────────────────────────────────────────────────────────────
-function MyBoard({ currentUser, tasks, setTasks, needs, meetings }) {
-  const [visibility, setVisibility] = React.useState('all'); // 'all' | 'public'
+function MyBoard({ currentUser, tasks, setTasks, needs, setNeeds, decisions, setDecisions, meetings }) {
+  const [boardTab, setBoardTab]   = React.useState('board'); // 'board' | 'history'
+  const [visibility, setVisibility] = React.useState('all');
   const [selectedTask, setSelectedTask] = React.useState(null);
   const [showPanel, setShowPanel] = React.useState(false);
-  const [creating, setCreating] = React.useState(false);
+  const [creating, setCreating]   = React.useState(false);
   const [draggingId, setDraggingId] = React.useState(null);
+  // Need form
+  const [showNeedForm, setShowNeedForm] = React.useState(false);
+  const otherMembers = TEAM.filter(m => m.id !== currentUser.id);
+  const [needForm, setNeedForm] = React.useState({ toId: otherMembers[0]?.id || '', description: '', dueDate: '', product: 'Group' });
+  // Decision form
+  const [showDecForm, setShowDecForm] = React.useState(false);
+  const [decForm, setDecForm] = React.useState({ topic: '', relevantIds: [], notes: '' });
+  // Expanded items
+  const [expandedNeed, setExpandedNeed] = React.useState(null);
+  const [expandedDec,  setExpandedDec]  = React.useState(null);
 
-  const myTasks = tasks.filter(t => t.ownerId === currentUser.id && t.status === 'active');
+  const myTasks          = tasks.filter(t => t.ownerId === currentUser.id && t.status === 'active');
+  const myCompletedTasks = tasks.filter(t => t.ownerId === currentUser.id && t.status === 'complete');
   const filtered = myTasks.filter(t => visibility === 'all' || !t.isPrivate);
 
-  // Requests
-  const assignedToMe = needs.filter(n => n.toId === currentUser.id);
+  const assignedToMe = needs.filter(n => n.toId   === currentUser.id);
   const assignedByMe = needs.filter(n => n.fromId === currentUser.id);
+  const myDecisions  = decisions.filter(d => d.ownerId === currentUser.id || (d.relevantIds || []).includes(currentUser.id));
+  const openMyDecs   = myDecisions.filter(d => d.status === 'open');
 
-  function drop(taskId, quadrant) {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, quadrant } : t));
-  }
+  const activeMeeting = meetings.find(m => m.status === 'Active') || meetings[0];
 
+  // ── Task handlers ──────────────────────────────────────────────────────────
+  function drop(taskId, q) { setTasks(prev => prev.map(t => t.id === taskId ? { ...t, quadrant: q } : t)); }
   function openTask(t) { setSelectedTask(t); setCreating(false); setShowPanel(true); }
   function newTask()   { setSelectedTask(null); setCreating(true); setShowPanel(true); }
 
   function saveTask(draft) {
-    if (creating) {
-      setTasks(prev => [...prev, { ...draft, id: generateId('t'), createdAt: new Date().toISOString(), status: 'active', completedAt: null }]);
-    } else {
-      setTasks(prev => prev.map(t => t.id === draft.id ? { ...t, ...draft } : t));
-    }
+    if (creating) setTasks(prev => [...prev, { ...draft, id: generateId('t'), createdAt: new Date().toISOString(), status: 'active', completedAt: null }]);
+    else          setTasks(prev => prev.map(t => t.id === draft.id ? { ...t, ...draft } : t));
   }
-
   function completeTask(id) {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'complete', completedAt: new Date().toISOString() } : t));
   }
-
   function deleteTask(id) {
     setTasks(prev => prev.filter(t => t.id !== id));
     if (DB.isConfigured()) DB.deleteTask(id).catch(console.error);
   }
-
+  function restoreTask(id) {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'active', completedAt: null } : t));
+  }
   function togglePrivacy(taskId) {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, isPrivate: !t.isPrivate } : t));
+  }
+
+  // ── Need handlers ──────────────────────────────────────────────────────────
+  function addNeed() {
+    if (!needForm.description.trim()) return;
+    setNeeds(prev => [...prev, {
+      id: generateId('n'), fromId: currentUser.id, toId: needForm.toId,
+      description: needForm.description, status: 'pending',
+      dueDate: needForm.dueDate || null, product: needForm.product,
+      meetingId: activeMeeting?.id || null, createdAt: new Date().toISOString(),
+    }]);
+    setNeedForm({ toId: otherMembers[0]?.id || '', description: '', dueDate: '', product: 'Group' });
+    setShowNeedForm(false);
+  }
+  function markNeedDone(id) { setNeeds(prev => prev.map(n => n.id === id ? { ...n, status: 'done' } : n)); }
+  function deleteNeed(id) {
+    setNeeds(prev => prev.filter(n => n.id !== id));
+    if (DB.isConfigured()) DB.deleteNeed(id).catch(console.error);
+    setExpandedNeed(null);
+  }
+
+  // ── Decision handlers ──────────────────────────────────────────────────────
+  function addDecision() {
+    if (!decForm.topic.trim()) return;
+    setDecisions(prev => [...prev, {
+      id: generateId('d'), topic: decForm.topic, ownerId: currentUser.id,
+      relevantIds: decForm.relevantIds, status: 'open', outcome: '', notes: decForm.notes,
+      meetingId: activeMeeting?.id || null, createdAt: new Date().toISOString(),
+      approvedBy: null, approvedAt: null,
+    }]);
+    setDecForm({ topic: '', relevantIds: [], notes: '' });
+    setShowDecForm(false);
+  }
+  function approveDecision(id) {
+    setDecisions(prev => prev.map(d => d.id === id ? { ...d, status: 'approved', approvedBy: currentUser.id, approvedAt: new Date().toISOString() } : d));
+    setExpandedDec(null);
+  }
+  function deferDecision(id) {
+    setDecisions(prev => prev.map(d => d.id === id ? { ...d, status: 'deferred' } : d));
+    setExpandedDec(null);
+  }
+  function deleteDecision(id) {
+    setDecisions(prev => prev.filter(d => d.id !== id));
+    if (DB.isConfigured()) DB.deleteDecision(id).catch(console.error);
+    setExpandedDec(null);
+  }
+  function toggleDecRelevant(mid) {
+    setDecForm(p => ({
+      ...p, relevantIds: p.relevantIds.includes(mid) ? p.relevantIds.filter(x => x !== mid) : [...p.relevantIds, mid],
+    }));
   }
 
   const quadrants = [
@@ -518,131 +580,253 @@ function MyBoard({ currentUser, tasks, setTasks, needs, meetings }) {
     { id: 'delegate',  label: 'Delegate',  sublabel: 'Urgent + Not Important',     accentColor: COLORS.amber },
     { id: 'eliminate', label: 'Eliminate', sublabel: 'Not Urgent + Not Important', accentColor: COLORS.gray  },
   ];
-
   const owner = getTeamMember(currentUser.id);
+
+  // ── Reusable inline card ───────────────────────────────────────────────────
+  function sideCard(key, expanded, onToggle, label, labelColor, description, status, actions) {
+    const isExp = expanded === key;
+    return (
+      <div key={key} onClick={() => onToggle(isExp ? null : key)}
+        style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 7, cursor: 'pointer',
+          border: `1px solid ${isExp ? COLORS.brand : COLORS.border}`,
+          background: isExp ? COLORS.brandLight : '#FAFAFA', transition: 'all .15s' }}>
+        <div style={{ fontSize: 11, color: labelColor, fontWeight: 700, marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.4, marginBottom: 4 }}>{description}</div>
+        <StatusBadge status={status} />
+        {isExp && (
+          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+            {actions}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ height: '100vh', display: 'flex', overflow: 'hidden', background: COLORS.bg }}>
-      {/* Main board area */}
+      {/* ── Main board area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Toolbar */}
         <div style={{ background: '#fff', borderBottom: `1px solid ${COLORS.border}`, padding: '12px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Avatar memberId={currentUser.id} size={28} />
                 <span style={{ fontWeight: 800, fontSize: 16, color: owner?.color }}>{currentUser.name}'s Board</span>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[{ v: 'all', l: 'All Tasks' }, { v: 'public', l: 'Public Only' }].map(opt => (
-                  <button key={opt.v} onClick={() => setVisibility(opt.v)} style={{
-                    padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                    background: visibility === opt.v ? COLORS.textPrimary : '#F3F4F6',
-                    color: visibility === opt.v ? '#fff' : COLORS.textSecondary,
-                    transition: 'all .15s',
-                  }}>
-                    {opt.l}
-                  </button>
-                ))}
-              </div>
+              {/* Board / History tabs */}
+              {[{ v: 'board', l: 'Board' }, { v: 'history', l: 'History' }].map(opt => (
+                <button key={opt.v} onClick={() => setBoardTab(opt.v)} style={{
+                  padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  background: boardTab === opt.v ? COLORS.brand : 'transparent',
+                  color: boardTab === opt.v ? '#fff' : COLORS.textSecondary, transition: 'all .15s',
+                }}>{opt.l}</button>
+              ))}
+              {boardTab === 'board' && (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[{ v: 'all', l: 'All Tasks' }, { v: 'public', l: 'Public Only' }].map(opt => (
+                    <button key={opt.v} onClick={() => setVisibility(opt.v)} style={{
+                      padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      background: visibility === opt.v ? COLORS.textPrimary : '#F3F4F6',
+                      color: visibility === opt.v ? '#fff' : COLORS.textSecondary, transition: 'all .15s',
+                    }}>{opt.l}</button>
+                  ))}
+                </div>
+              )}
             </div>
-            <Btn variant="primary" size="sm" onClick={newTask}>+ Add Task</Btn>
+            {boardTab === 'board'
+              ? <Btn variant="primary" size="sm" onClick={newTask}>+ Add Task</Btn>
+              : <span style={{ fontSize: 12, color: COLORS.textMuted }}>{myCompletedTasks.length} completed</span>
+            }
           </div>
         </div>
 
-        {/* Grid */}
-        <div style={{ flex: 1, padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 12, overflow: 'hidden' }}>
-          {quadrants.map(q => {
-            const qTasks = filtered.filter(t => t.quadrant === q.id);
-            return (
-              <div
-                key={q.id}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('taskId'); if (id) drop(id, q.id); }}
-                style={{ flex: 1, background: COLORS.bg, border: `1.5px solid ${COLORS.border}`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-              >
-                <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 4, height: 16, borderRadius: 2, background: q.accentColor }} />
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{q.label}</span>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>{q.sublabel}</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: q.accentColor + '22', color: q.accentColor, padding: '1px 7px', borderRadius: 10 }}>
-                    {qTasks.length}
-                  </span>
+        {/* Board grid */}
+        {boardTab === 'board' && (
+          <div style={{ flex: 1, padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 12, overflow: 'hidden' }}>
+            {quadrants.map(q => {
+              const qTasks = filtered.filter(t => t.quadrant === q.id);
+              return (
+                <div key={q.id}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('taskId'); if (id) drop(id, q.id); }}
+                  style={{ background: COLORS.bg, border: `1.5px solid ${COLORS.border}`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                >
+                  <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 4, height: 16, borderRadius: 2, background: q.accentColor }} />
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{q.label}</span>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted }}>{q.sublabel}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: q.accentColor + '22', color: q.accentColor, padding: '1px 7px', borderRadius: 10 }}>{qTasks.length}</span>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto' }}>
+                    {qTasks.length === 0
+                      ? <div style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', padding: '16px 4px' }}>Empty</div>
+                      : qTasks.map(t => (
+                        <div key={t.id} style={{ position: 'relative' }}>
+                          <TaskCard task={t} currentUser={currentUser}
+                            isDragging={draggingId === t.id}
+                            onDragStart={() => setDraggingId(t.id)}
+                            onDragEnd={() => setDraggingId(null)}
+                            onClick={() => openTask(t)}
+                            showBadge={false}
+                          />
+                          <button onClick={e => { e.stopPropagation(); togglePrivacy(t.id); }}
+                            title={t.isPrivate ? 'Click to make public' : 'Click to make private'}
+                            style={{
+                              position: 'absolute', top: 8, right: 8,
+                              background: 'rgba(255,255,255,0.95)', border: `1px solid ${COLORS.border}`,
+                              borderRadius: 5, cursor: 'pointer', fontSize: 10, padding: '2px 6px',
+                              color: t.isPrivate ? COLORS.red : COLORS.blue, fontWeight: 700,
+                            }}>
+                            {t.isPrivate ? '🔒→🌐' : '🌐→🔒'}
+                          </button>
+                        </div>
+                      ))
+                    }
+                  </div>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {qTasks.length === 0
-                    ? <div style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', padding: '16px 4px' }}>Empty</div>
-                    : qTasks.map(t => (
-                      <div key={t.id} style={{ position: 'relative' }}>
-                        <TaskCard
-                          task={t} currentUser={currentUser}
-                          isDragging={draggingId === t.id}
-                          onDragStart={() => setDraggingId(t.id)}
-                          onDragEnd={() => setDraggingId(null)}
-                          onClick={() => openTask(t)}
-                        />
-                        {/* Privacy toggle */}
-                        <button
-                          onClick={e => { e.stopPropagation(); togglePrivacy(t.id); }}
-                          title={t.isPrivate ? 'Click to make public' : 'Click to make private'}
-                          style={{
-                            position: 'absolute', top: 6, right: 6,
-                            background: 'rgba(255,255,255,0.95)', border: `1px solid ${COLORS.border}`,
-                            borderRadius: 5, cursor: 'pointer', fontSize: 10, padding: '2px 6px',
-                            color: t.isPrivate ? COLORS.red : COLORS.blue, fontWeight: 700,
-                          }}>
-                          {t.isPrivate ? '🔒→🌐' : '🌐→🔒'}
-                        </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* History */}
+        {boardTab === 'history' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+            <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Completed Tasks</h3>
+            {myCompletedTasks.length === 0
+              ? <EmptyState icon="✅" text="No completed tasks yet." />
+              : myCompletedTasks.map(t => (
+                <Card key={t.id} style={{ marginBottom: 8, opacity: 0.8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, textDecoration: 'line-through', color: COLORS.textSecondary }}>{t.title}</span>
+                        <ProductChip product={t.product} />
+                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>Completed {formatRelativeTime(t.completedAt)}</span>
                       </div>
-                    ))
-                  }
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn size="sm" onClick={() => restoreTask(t.id)}>↩ Restore</Btn>
+                      <Btn size="sm" variant="danger" onClick={() => deleteTask(t.id)}>🗑</Btn>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            }
+          </div>
+        )}
       </div>
 
-      {/* Requests panel */}
-      <div style={{ width: 220, flexShrink: 0, borderLeft: `1px solid ${COLORS.border}`, background: '#fff', overflowY: 'auto', padding: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Requests</div>
+      {/* ── Right panel: Requests + Decisions ── */}
+      <div style={{ width: 270, flexShrink: 0, borderLeft: `1px solid ${COLORS.border}`, background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
 
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 10 }}>
-            Assigned to me
-          </div>
-          {assignedToMe.length === 0
-            ? <div style={{ fontSize: 12, color: COLORS.textMuted }}>None</div>
-            : assignedToMe.map(n => {
-              const from = getTeamMember(n.fromId);
-              return (
-                <div key={n.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${COLORS.borderLight}` }}>
-                  <div style={{ fontSize: 11, color: from?.color, fontWeight: 700, marginBottom: 4 }}>from {from?.name}</div>
-                  <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.4, marginBottom: 4 }}>{n.description}</div>
-                  <StatusBadge status={n.status} />
-                </div>
-              );
-            })
-          }
-        </div>
+          {/* ── REQUESTS ── */}
+          <div style={{ padding: '14px 14px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>Requests</span>
+              <Btn size="sm" variant="primary" onClick={() => setShowNeedForm(v => !v)}>+ Add</Btn>
+            </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 10 }}>
-            Assigned by me
-          </div>
-          {assignedByMe.length === 0
-            ? <div style={{ fontSize: 12, color: COLORS.textMuted }}>None</div>
-            : assignedByMe.map(n => {
-              const to = getTeamMember(n.toId);
-              return (
-                <div key={n.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${COLORS.borderLight}` }}>
-                  <div style={{ fontSize: 11, color: to?.color, fontWeight: 700, marginBottom: 4 }}>→ {to?.name}</div>
-                  <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.4, marginBottom: 4 }}>{n.description}</div>
-                  <StatusBadge status={n.status} />
+            {showNeedForm && (
+              <div style={{ marginBottom: 12, padding: 10, background: COLORS.brandLight, borderRadius: 8, border: `1px solid ${COLORS.brand}44` }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <Select label="To" value={needForm.toId} onChange={v => setNeedForm(p => ({...p, toId: v}))}
+                    options={otherMembers.map(m => ({ value: m.id, label: m.name }))} />
+                  <Textarea label="Description" value={needForm.description}
+                    onChange={v => setNeedForm(p => ({...p, description: v}))} placeholder="What do you need?" rows={2} />
+                  <Select label="Product" value={needForm.product} onChange={v => setNeedForm(p => ({...p, product: v}))}
+                    options={PRODUCTS.map(p => ({ value: p, label: p }))} />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Btn variant="primary" size="sm" onClick={addNeed}>Add</Btn>
+                    <Btn size="sm" onClick={() => setShowNeedForm(false)}>Cancel</Btn>
+                  </div>
                 </div>
-              );
-            })
-          }
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 8 }}>Assigned to me</div>
+            {assignedToMe.length === 0
+              ? <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>None</div>
+              : assignedToMe.map(n => {
+                const from = getTeamMember(n.fromId);
+                return sideCard(n.id, expandedNeed, setExpandedNeed,
+                  `from ${from?.name}`, from?.color, n.description, n.status,
+                  <>
+                    {n.status !== 'done' && <Btn size="sm" variant="success" onClick={() => markNeedDone(n.id)}>✓ Done</Btn>}
+                    <Btn size="sm" variant="danger" onClick={() => deleteNeed(n.id)}>🗑</Btn>
+                  </>
+                );
+              })
+            }
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 8, marginTop: 8 }}>Assigned by me</div>
+            {assignedByMe.length === 0
+              ? <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>None</div>
+              : assignedByMe.map(n => {
+                const to = getTeamMember(n.toId);
+                return sideCard(n.id, expandedNeed, setExpandedNeed,
+                  `→ ${to?.name}`, to?.color, n.description, n.status,
+                  <>
+                    {n.status !== 'done' && <Btn size="sm" variant="success" onClick={() => markNeedDone(n.id)}>✓ Done</Btn>}
+                    <Btn size="sm" variant="danger" onClick={() => deleteNeed(n.id)}>🗑</Btn>
+                  </>
+                );
+              })
+            }
+          </div>
+
+          {/* ── DECISIONS ── */}
+          <div style={{ borderTop: `1px solid ${COLORS.border}`, padding: '14px 14px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>Decisions</span>
+              <Btn size="sm" variant="primary" onClick={() => setShowDecForm(v => !v)}>+ Add</Btn>
+            </div>
+
+            {showDecForm && (
+              <div style={{ marginBottom: 12, padding: 10, background: COLORS.brandLight, borderRadius: 8, border: `1px solid ${COLORS.brand}44` }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <Input label="Topic *" value={decForm.topic} onChange={v => setDecForm(p => ({...p, topic: v}))} placeholder="What needs to be decided?" />
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, display: 'block', marginBottom: 5 }}>Relevant people</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {TEAM.map(m => (
+                        <div key={m.id} onClick={() => toggleDecRelevant(m.id)}
+                          style={{
+                            padding: '2px 8px', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                            border: `1.5px solid ${decForm.relevantIds.includes(m.id) ? m.color : COLORS.border}`,
+                            background: decForm.relevantIds.includes(m.id) ? m.color + '18' : '#fff',
+                            color: decForm.relevantIds.includes(m.id) ? m.color : COLORS.textSecondary,
+                          }}>{m.name}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <Textarea label="Notes" value={decForm.notes} onChange={v => setDecForm(p => ({...p, notes: v}))} rows={2} />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Btn variant="primary" size="sm" onClick={addDecision}>Add</Btn>
+                    <Btn size="sm" onClick={() => setShowDecForm(false)}>Cancel</Btn>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {openMyDecs.length === 0 && !showDecForm
+              ? <div style={{ fontSize: 12, color: COLORS.textMuted }}>No open decisions</div>
+              : openMyDecs.map(d => {
+                const decOwner = getTeamMember(d.ownerId);
+                const isOwner  = d.ownerId === currentUser.id;
+                return sideCard(d.id, expandedDec, setExpandedDec,
+                  `${decOwner?.name} · open`, decOwner?.color, d.topic, d.status,
+                  <>
+                    <Btn size="sm" variant="success" onClick={() => approveDecision(d.id)}>✓ Approve</Btn>
+                    <Btn size="sm" onClick={() => deferDecision(d.id)}>→ Defer</Btn>
+                    {isOwner && <Btn size="sm" variant="danger" onClick={() => deleteDecision(d.id)}>🗑</Btn>}
+                  </>
+                );
+              })
+            }
+          </div>
         </div>
       </div>
 

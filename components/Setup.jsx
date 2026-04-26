@@ -39,6 +39,25 @@ function Setup({ onConnected }) {
   // ── DB status ─────────────────────────────────────────────────────────────
   const connected = DB.isConfigured();
 
+  // ── Reset tab ─────────────────────────────────────────────────────────────
+  const [resetStatus, setResetStatus] = React.useState('idle');
+  const [resetMsg,    setResetMsg]    = React.useState('');
+
+  async function resetDatabase() {
+    if (!window.confirm('This will permanently delete ALL meetings, tasks, needs, decisions, and updates from the database AND clear your browser cache. Are you absolutely sure?')) return;
+    setResetStatus('running'); setResetMsg('');
+    try {
+      await DB.clearAll();
+      // Clear localStorage too
+      ['bgh-meetings','bgh-tasks','bgh-needs','bgh-decisions','bgh-updates'].forEach(k => localStorage.removeItem(k));
+      setResetStatus('done');
+      setResetMsg('Database cleared. Reload the page to start fresh with empty data.');
+    } catch (e) {
+      setResetStatus('error');
+      setResetMsg(e.message || 'Reset failed.');
+    }
+  }
+
   // ── Migrate tab ──────────────────────────────────────────────────────────
   const [migrateStatus, setMigrateStatus] = React.useState('idle');
   const [migrateMsg,    setMigrateMsg]    = React.useState('');
@@ -112,6 +131,7 @@ function Setup({ onConnected }) {
   const tabs = [
     { id: 'migrate', label: 'Migrate current data' },
     { id: 'import',  label: 'Import historical meetings' },
+    { id: 'reset',   label: '⚠ Reset database' },
   ];
 
   return (
@@ -318,6 +338,37 @@ function Setup({ onConnected }) {
             </Card>
           </div>
         )}
+        {/* ── RESET ── */}
+        {tab === 'reset' && (
+          <Card style={{ border: `1.5px solid ${COLORS.red}44` }}>
+            <h3 style={{ fontWeight: 700, fontSize: 15, color: COLORS.red, marginBottom: 8 }}>
+              ⚠ Reset Database
+            </h3>
+            <p style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 16 }}>
+              Permanently deletes <strong>all records</strong> from Supabase (meetings, tasks, needs, decisions, updates)
+              and clears your browser cache. Use this to start fresh and populate the system with real data.
+              <br /><strong style={{ color: COLORS.red }}>This cannot be undone.</strong>
+            </p>
+            {resetMsg && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14,
+                background: resetStatus === 'error' ? COLORS.redLight : COLORS.greenLight,
+                color: resetStatus === 'error' ? COLORS.red : COLORS.green,
+                border: `1px solid ${resetStatus === 'error' ? COLORS.red : COLORS.green}44`,
+              }}>
+                {resetMsg}
+              </div>
+            )}
+            <Btn
+              variant="danger"
+              onClick={resetDatabase}
+              disabled={!connected || resetStatus === 'running'}
+            >
+              {resetStatus === 'running' ? 'Clearing…' : '🗑 Clear all database records'}
+            </Btn>
+          </Card>
+        )}
+
       </div>
     </div>
   );

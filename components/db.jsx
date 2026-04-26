@@ -154,6 +154,17 @@ async function deleteMeeting(id) {
   await _sb.from('meetings').delete().eq('id', id);
 }
 
+// Delete everything — used by Setup "Reset Database"
+async function clearAll() {
+  await Promise.all([
+    _sb.from('updates').delete().not('id', 'is', null),
+    _sb.from('decisions').delete().not('id', 'is', null),
+    _sb.from('needs').delete().not('id', 'is', null),
+    _sb.from('tasks').delete().not('id', 'is', null),
+    _sb.from('meetings').delete().not('id', 'is', null),
+  ]);
+}
+
 // ─── REALTIME ────────────────────────────────────────────────────────────────
 function subscribe(handlers) {
   // handlers: { onTask, onNeed, onDecision, onMeeting, onUpdate }
@@ -248,7 +259,7 @@ window.DB = {
   isConfigured, init,
   fetchAll,
   syncMeetings, syncTasks, syncNeeds, syncDecisions, syncUpdates,
-  deleteTask, deleteNeed, deleteDecision, deleteMeeting,
+  deleteTask, deleteNeed, deleteDecision, deleteMeeting, clearAll,
   subscribe,
   importMeetingBundle,
   testConnection,

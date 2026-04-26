@@ -35,20 +35,32 @@ function App() {
   });
 
   const [dbLoading, setDbLoading] = React.useState(false);
+  // Gate: don't sync initial localStorage/INIT data to Supabase; only sync after DB load
+  const dbLoadedRef = React.useRef(false);
 
   // ── LOAD FROM SUPABASE on mount (if configured) ───────────────────────────
   React.useEffect(() => {
-    if (!DB.isConfigured()) return;
+    if (!DB.isConfigured()) {
+      dbLoadedRef.current = true; // localStorage-only mode: allow syncing immediately
+      return;
+    }
     setDbLoading(true);
     DB.fetchAll()
       .then(data => {
+        // Override local state with authoritative DB data
         if (data.meetings.length  > 0) setMeetings(data.meetings);
+        else setMeetings([]);
         if (data.tasks.length     > 0) setTasks(data.tasks);
+        else setTasks([]);
         if (data.needs.length     > 0) setNeeds(data.needs);
+        else setNeeds([]);
         if (data.decisions.length > 0) setDecisions(data.decisions);
+        else setDecisions([]);
         if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
+        else setUpdates({});
+        dbLoadedRef.current = true; // NOW allow syncing user changes
       })
-      .catch(e => console.error('Supabase load:', e))
+      .catch(e => { console.error('Supabase load:', e); dbLoadedRef.current = true; })
       .finally(() => setDbLoading(false));
   }, []);
 
@@ -78,8 +90,10 @@ function App() {
           });
         }
       },
-      onDecision: ({ eventType, new: n }) => {
-        if (eventType !== 'DELETE') {
+      onDecision: ({ eventType, new: n, old: o }) => {
+        if (eventType === 'DELETE') {
+          setDecisions(prev => prev.filter(x => x.id !== o.id));
+        } else {
           const d = DB.decisionFromDB(n);
           setDecisions(prev => {
             const f = prev.filter(x => x.id !== d.id);
@@ -87,8 +101,10 @@ function App() {
           });
         }
       },
-      onMeeting: ({ eventType, new: n }) => {
-        if (eventType !== 'DELETE') {
+      onMeeting: ({ eventType, new: n, old: o }) => {
+        if (eventType === 'DELETE') {
+          setMeetings(prev => prev.filter(x => x.id !== o.id));
+        } else {
           const m = DB.meetingFromDB(n);
           setMeetings(prev => {
             const f = prev.filter(x => x.id !== m.id);
@@ -114,30 +130,30 @@ function App() {
     return () => { channel && channel.unsubscribe && channel.unsubscribe(); };
   }, []);
 
-  // ── PERSIST (localStorage + Supabase on every change) ────────────────────
+  // ── PERSIST (localStorage always; Supabase only after initial DB load) ────
   React.useEffect(() => {
     localStorage.setItem('bgh-meetings', JSON.stringify(meetings));
-    if (DB.isConfigured()) DB.syncMeetings(meetings).catch(console.error);
+    if (DB.isConfigured() && dbLoadedRef.current) DB.syncMeetings(meetings).catch(console.error);
   }, [meetings]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-tasks', JSON.stringify(tasks));
-    if (DB.isConfigured()) DB.syncTasks(tasks).catch(console.error);
+    if (DB.isConfigured() && dbLoadedRef.current) DB.syncTasks(tasks).catch(console.error);
   }, [tasks]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-needs', JSON.stringify(needs));
-    if (DB.isConfigured()) DB.syncNeeds(needs).catch(console.error);
+    if (DB.isConfigured() && dbLoadedRef.current) DB.syncNeeds(needs).catch(console.error);
   }, [needs]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-decisions', JSON.stringify(decisions));
-    if (DB.isConfigured()) DB.syncDecisions(decisions).catch(console.error);
+    if (DB.isConfigured() && dbLoadedRef.current) DB.syncDecisions(decisions).catch(console.error);
   }, [decisions]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-updates', JSON.stringify(updates));
-    if (DB.isConfigured()) DB.syncUpdates(updates).catch(console.error);
+    if (DB.isConfigured() && dbLoadedRef.current) DB.syncUpdates(updates).catch(console.error);
   }, [updates]);
 
   // ── AUTH HANDLERS ─────────────────────────────────────────────────────────
@@ -212,7 +228,8 @@ function App() {
           <MyBoard
             currentUser={currentUser}
             tasks={tasks} setTasks={setTasks}
-            needs={needs}
+            needs={needs} setNeeds={setNeeds}
+            decisions={decisions} setDecisions={setDecisions}
             meetings={meetings}
           />
         )}
