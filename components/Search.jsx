@@ -24,20 +24,29 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
   ];
 
   function buildSystemPrompt() {
-    const currentMeeting = meetings.find(m => m.status === 'Active') || meetings[0];
-    const meetingUpdates = (currentMeeting && updates[currentMeeting.id]) || {};
-
     let ctx = `You are the Baims Group Hub intelligence assistant. You have access to all meeting notes, tasks, decisions, cross-team requests, and KPI data for the Baims Group leadership team. Answer questions concisely and accurately based only on the data provided. Cite your sources inline using [Meeting Apr 21], [Task #3], [KPI Orcas UAE] style references.\n\n`;
 
-    // Current meeting updates
-    ctx += `=== CURRENT MEETING: ${currentMeeting?.label} (${currentMeeting?.dateRange}) ===\n`;
-    TEAM.forEach(member => {
-      const row = meetingUpdates[member.id] || {};
-      ctx += `\n[${member.name} — ${member.role}]\n`;
-      if (row.general) ctx += `  General: ${row.general}\n`;
-      if (row.budget)  ctx += `  Budget: ${row.budget}\n`;
-      if (row.needs)   ctx += `  Needs: ${row.needs}\n`;
-      if (row.launch)  ctx += `  Launch/Projects: ${row.launch}\n`;
+    // All meetings' updates (most recent first)
+    const sortedMeetings = [...meetings].sort((a, b) => b.id.localeCompare(a.id));
+    sortedMeetings.forEach(meeting => {
+      const meetingUpdates = updates[meeting.id] || {};
+      const hasNotes = TEAM.some(m => {
+        const r = meetingUpdates[m.id] || {};
+        return r.general || r.budget || r.needs || r.launch;
+      });
+      if (!hasNotes) return;
+      const tag = meeting.status === 'Active' ? ' [CURRENT]' : '';
+      ctx += `=== MEETING: ${meeting.label} (${meeting.dateRange})${tag} ===\n`;
+      TEAM.forEach(member => {
+        const row = meetingUpdates[member.id] || {};
+        if (!row.general && !row.budget && !row.needs && !row.launch) return;
+        ctx += `\n[${member.name} — ${member.role}]\n`;
+        if (row.general) ctx += `  General: ${row.general}\n`;
+        if (row.budget)  ctx += `  Budget: ${row.budget}\n`;
+        if (row.needs)   ctx += `  Needs: ${row.needs}\n`;
+        if (row.launch)  ctx += `  Launch/Projects: ${row.launch}\n`;
+      });
+      ctx += '\n';
     });
 
     // Tasks
@@ -65,14 +74,17 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
       ctx += '\n';
     });
 
-    // KPI summary
-    ctx += `\n=== KPI SUMMARY ===\n`;
+    // Full KPI data — all 7 metrics per product
+    ctx += `\n=== KPI DATA ===\n`;
     [KPI_DATA.orcas, KPI_DATA.baims, KPI_DATA.medmasters].forEach(prod => {
       ctx += `\n${prod.name}:\n`;
-      const salesMetric = prod.metrics[0];
-      salesMetric.rows.forEach(row => {
-        const vs = row.actual >= row.target ? '✓' : '✗';
-        ctx += `  ${row.market} Sales: $${row.actual.toLocaleString()} / $${row.target.toLocaleString()} ${vs}\n`;
+      prod.metrics.forEach(metric => {
+        ctx += `  ${metric.label}:\n`;
+        metric.rows.forEach(row => {
+          const vs = row.actual >= row.target ? '✓' : '✗';
+          const fmt = v => Number.isInteger(v) ? v.toLocaleString() : v;
+          ctx += `    ${row.market}: ${fmt(row.actual)} / ${fmt(row.target)} ${vs}\n`;
+        });
       });
     });
 
