@@ -674,11 +674,12 @@ function MyBoard({ currentUser, tasks, setTasks, needs, setNeeds, decisions, set
                             title={t.isPrivate ? 'Click to make public' : 'Click to make private'}
                             style={{
                               position: 'absolute', top: 8, right: 8,
-                              background: 'rgba(255,255,255,0.95)', border: `1px solid ${COLORS.border}`,
-                              borderRadius: 5, cursor: 'pointer', fontSize: 10, padding: '2px 6px',
+                              background: t.isPrivate ? '#FEF2F2' : '#EFF6FF',
+                              border: 'none', borderRadius: 4, cursor: 'pointer',
+                              fontSize: 10, padding: '2px 7px',
                               color: t.isPrivate ? COLORS.red : COLORS.blue, fontWeight: 700,
                             }}>
-                            {t.isPrivate ? '🔒→🌐' : '🌐→🔒'}
+                            {t.isPrivate ? '🔒 Private' : '🌐 Public'}
                           </button>
                         </div>
                       ))
