@@ -1,11 +1,122 @@
 
+// ── Chart palette ──────────────────────────────────────────────────────────
+const CHART_PALETTE = [
+  '#2D6A4F','#40916C','#74C69D',
+  '#1D4ED8','#3B82F6','#93C5FD',
+  '#B45309','#D97706','#FCD34D',
+  '#7C3AED','#A855F7','#D8B4FE',
+];
+
+// Renders a ```chart JSON block as a Chart.js canvas
+function ChartBlock({ data }) {
+  const canvasRef  = React.useRef(null);
+  const chartRef   = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!canvasRef.current || !window.Chart) return;
+    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+
+    const isPie = data.type === 'pie' || data.type === 'doughnut';
+
+    try {
+      chartRef.current = new window.Chart(canvasRef.current, {
+        type: data.type || 'bar',
+        data: {
+          labels: data.labels || [],
+          datasets: (data.datasets || []).map((ds, i) => {
+            const base = ds.color || CHART_PALETTE[i % CHART_PALETTE.length];
+            return {
+              label:           ds.label,
+              data:            ds.data,
+              backgroundColor: isPie
+                ? CHART_PALETTE.slice(0, (ds.data || []).length)
+                : base + (data.type === 'line' ? '33' : 'CC'),
+              borderColor:     isPie ? '#fff' : base,
+              borderWidth:     isPie ? 2 : 1.5,
+              tension:         0.35,
+              fill:            false,
+              pointRadius:     data.type === 'line' ? 4 : undefined,
+              pointHoverRadius:data.type === 'line' ? 6 : undefined,
+            };
+          }),
+        },
+        options: {
+          indexAxis:  data.horizontal ? 'y' : 'x',
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            title: {
+              display: !!data.title,
+              text:    data.title,
+              font:    { size: 14, weight: '700' },
+              color:   '#0F172A',
+              padding: { bottom: 14 },
+            },
+            legend: {
+              display: isPie || (data.datasets || []).length > 1,
+              labels:  { font: { size: 12 }, color: '#374151', boxWidth: 12, padding: 14 },
+            },
+            tooltip: { mode: 'index', intersect: false },
+          },
+          scales: isPie ? {} : {
+            y: { ticks: { color: '#6B7280', font: { size: 11 } }, grid: { color: '#F3F4F6' } },
+            x: { ticks: { color: '#6B7280', font: { size: 11 } }, grid: { display: false } },
+          },
+        },
+      });
+    } catch (e) {
+      console.error('Chart render error', e);
+    }
+
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, [JSON.stringify(data)]);
+
+  return (
+    <div style={{ margin: '16px 0', padding: '16px 20px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12 }}>
+      <canvas ref={canvasRef} style={{ maxHeight: 320 }} />
+    </div>
+  );
+}
+
+// Splits markdown text into md segments and chart segments, renders both
+function MarkdownAnswer({ text }) {
+  const parts = React.useMemo(() => {
+    const result = [];
+    const regex  = /```chart\n([\s\S]*?)```/g;
+    let last = 0, match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > last) result.push({ type: 'md', content: text.slice(last, match.index) });
+      try { result.push({ type: 'chart', data: JSON.parse(match[1]) }); }
+      catch { result.push({ type: 'md', content: match[0] }); }
+      last = match.index + match[0].length;
+    }
+    if (last < text.length) result.push({ type: 'md', content: text.slice(last) });
+    return result;
+  }, [text]);
+
+  return (
+    <div className="md-body">
+      {parts.map((p, i) =>
+        p.type === 'chart'
+          ? <ChartBlock key={i} data={p.data} />
+          : <div key={i} dangerouslySetInnerHTML={{
+              __html: window.marked
+                ? window.marked.parse(p.content, { breaks: true, gfm: true })
+                : p.content
+            }} />
+      )}
+    </div>
+  );
+}
+
+// ── Main Search component ──────────────────────────────────────────────────
 function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
-  const [query, setQuery]     = React.useState('');
-  const [history, setHistory] = React.useState([]); // [{ id, query, text }]
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError]     = React.useState(null);
+  const [query,    setQuery]    = React.useState('');
+  const [history,  setHistory]  = React.useState([]);
+  const [loading,  setLoading]  = React.useState(false);
+  const [error,    setError]    = React.useState(null);
   const [followUp, setFollowUp] = React.useState('');
-  const [expanded, setExpanded] = React.useState({}); // history item expand state
+  const [expanded, setExpanded] = React.useState({});
   const inputRef = React.useRef(null);
 
   const current = history[0] || null;
@@ -17,30 +128,40 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
     'Which decisions are still open?',
     "What's blocking the Australia launch?",
     'Show me overdue tasks',
-    'What does Bader need from Khalaf?',
+    'Chart Orcas sales vs target by market',
   ];
 
-  function renderMarkdown(text) {
-    if (!window.marked) return text;
-    return window.marked.parse(text, { breaks: true, gfm: true });
-  }
-
   function buildSystemPrompt() {
-    let ctx = `You are the Baims Group Hub intelligence assistant. You have access to all meeting notes, tasks, decisions, cross-team requests, and KPI data for the Baims Group leadership team. Answer questions concisely and accurately based only on the data provided. Cite your sources inline using [Meeting Apr 21], [Task #3], [KPI Orcas UAE] style references. Format your responses using markdown: use **bold** for emphasis, tables for structured data, and > blockquotes for notes or highlights.\n\n`;
+    let ctx = `You are the Baims Group Hub intelligence assistant. You have access to all meeting notes, tasks, decisions, cross-team requests, and KPI data for the Baims Group leadership team. Answer questions concisely and accurately based only on the data provided. Cite sources inline: [Meeting Apr 21], [Task #3], [KPI Orcas UAE].
 
-    // All meetings' updates (most recent first)
+Format responses in markdown: **bold** for emphasis, tables for structured data, > blockquotes for highlights or notes.
+
+When a question is best answered with a chart, output it using this exact format immediately after any explanation text:
+\`\`\`chart
+{
+  "type": "bar",
+  "title": "Chart title here",
+  "labels": ["Label1", "Label2"],
+  "datasets": [
+    { "label": "Series A", "data": [100, 200], "color": "#2D6A4F" },
+    { "label": "Series B", "data": [80,  180], "color": "#3B82F6" }
+  ]
+}
+\`\`\`
+Supported types: "bar", "line", "pie", "doughnut". Add "horizontal": true for horizontal bars.
+You may include multiple charts in one response. Only output chart JSON when it genuinely adds value.
+
+`;
+
     const sortedMeetings = [...meetings].sort((a, b) => b.id.localeCompare(a.id));
     sortedMeetings.forEach(meeting => {
-      const meetingUpdates = updates[meeting.id] || {};
-      const hasNotes = TEAM.some(m => {
-        const r = meetingUpdates[m.id] || {};
-        return r.general || r.budget || r.needs || r.launch;
-      });
+      const mu = updates[meeting.id] || {};
+      const hasNotes = TEAM.some(m => { const r = mu[m.id] || {}; return r.general || r.budget || r.needs || r.launch; });
       if (!hasNotes) return;
       const tag = meeting.status === 'Active' ? ' [CURRENT]' : '';
       ctx += `=== MEETING: ${meeting.label} (${meeting.dateRange})${tag} ===\n`;
       TEAM.forEach(member => {
-        const row = meetingUpdates[member.id] || {};
+        const row = mu[member.id] || {};
         if (!row.general && !row.budget && !row.needs && !row.launch) return;
         ctx += `\n[${member.name} — ${member.role}]\n`;
         if (row.general) ctx += `  General: ${row.general}\n`;
@@ -100,7 +221,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 1500,
+          max_tokens: 2000,
           system: buildSystemPrompt(),
           messages: [{ role: 'user', content: q }],
         }),
@@ -111,7 +232,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
         throw new Error(err?.error?.message || `API error ${res.status}`);
       }
 
-      const data = await res.json();
+      const data  = await res.json();
       const entry = { id: Date.now(), query: q, text: data.content[0].text };
       setHistory(prev => [entry, ...prev]);
       setQuery('');
@@ -148,27 +269,14 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
     }
     .md-body blockquote p { margin: 0; }
     .md-body table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
-    .md-body th {
-      background: #F1F5F9; font-weight: 700; text-align: left;
-      padding: 8px 12px; border: 1px solid #E2E8F0; color: #334155;
-    }
+    .md-body th { background: #F1F5F9; font-weight: 700; text-align: left; padding: 8px 12px; border: 1px solid #E2E8F0; color: #334155; }
     .md-body td { padding: 7px 12px; border: 1px solid #E2E8F0; color: #374151; }
     .md-body tr:nth-child(even) td { background: #F8FAFC; }
-    .md-body code {
-      background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 4px;
-      padding: 1px 5px; font-size: 12px; font-family: 'SF Mono', Menlo, monospace; color: #0F172A;
-    }
-    .md-body pre {
-      background: #0F172A; border-radius: 8px; padding: 14px 16px; margin: 10px 0; overflow-x: auto;
-    }
-    .md-body pre code {
-      background: none; border: none; color: #E2E8F0; font-size: 12px; padding: 0;
-    }
+    .md-body code { background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 4px; padding: 1px 5px; font-size: 12px; font-family: 'SF Mono',Menlo,monospace; color: #0F172A; }
+    .md-body pre { background: #0F172A; border-radius: 8px; padding: 14px 16px; margin: 10px 0; overflow-x: auto; }
+    .md-body pre code { background: none; border: none; color: #E2E8F0; font-size: 12px; padding: 0; }
     .md-body hr { border: none; border-top: 1px solid #E5E7EB; margin: 14px 0; }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 1; }
-    }
+    @keyframes pulse { 0%,100% { opacity:.3; } 50% { opacity:1; } }
   `;
 
   return (
@@ -185,7 +293,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
               <p style={{ fontSize: 15, color: COLORS.textSecondary }}>Search across meetings, tasks, KPIs, decisions and team updates</p>
             </div>
 
-            {/* Search input */}
+            {/* Input */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
               <div style={{ flex: 1, position: 'relative' }}>
                 <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: COLORS.textMuted, fontSize: 15 }}>🔍</span>
@@ -194,7 +302,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && search(query)}
-                  placeholder="Ask anything…  e.g. How is Orcas UAE performing?"
+                  placeholder="Ask anything or request a chart…"
                   style={{
                     width: '100%', padding: '13px 14px 13px 42px',
                     borderRadius: 12, border: `1.5px solid ${COLORS.border}`,
@@ -231,8 +339,7 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
           <>
             {/* Toolbar */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <button onClick={reset}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: COLORS.brand, fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: COLORS.brand, fontWeight: 600, padding: '4px 0' }}>
                 ← New search
               </button>
               {history.length > 1 && (
@@ -241,32 +348,24 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
             </div>
 
             {/* Current answer */}
-            <div style={{
-              background: '#fff', border: `1px solid ${COLORS.border}`, borderRadius: 14,
-              overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.07)', marginBottom: 12,
-            }}>
-              {/* Question bar */}
-              <div style={{ padding: '12px 20px', background: 'linear-gradient(135deg, #F0FDF9 0%, #E8F5F0 100%)', borderBottom: `1px solid ${COLORS.border}` }}>
+            <div style={{ background: '#fff', border: `1px solid ${COLORS.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.07)', marginBottom: 12 }}>
+              <div style={{ padding: '12px 20px', background: 'linear-gradient(135deg,#F0FDF9 0%,#E8F5F0 100%)', borderBottom: `1px solid ${COLORS.border}` }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.brand, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Q</span>
                 <span style={{ fontSize: 13, color: COLORS.textPrimary, marginLeft: 8, fontWeight: 500 }}>{current.query}</span>
               </div>
-              {/* Answer body */}
               <div style={{ padding: '20px 24px' }}>
-                <div
-                  className="md-body"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(current.text) }}
-                />
+                <MarkdownAnswer text={current.text} />
               </div>
             </div>
 
-            {/* Follow-up input */}
+            {/* Follow-up */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
               <div style={{ flex: 1 }}>
                 <input
                   value={followUp}
                   onChange={e => setFollowUp(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && followUp.trim()) search(followUp); }}
-                  placeholder="Ask a follow-up…"
+                  placeholder="Ask a follow-up or request a chart…"
                   style={{
                     width: '100%', padding: '11px 14px',
                     borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
@@ -287,30 +386,17 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {past.map(item => (
-                    <div key={item.id} style={{
-                      background: '#fff', border: `1px solid ${COLORS.border}`,
-                      borderRadius: 10, overflow: 'hidden',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-                    }}>
+                    <div key={item.id} style={{ background: '#fff', border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                       <button
                         onClick={() => setExpanded(p => ({ ...p, [item.id]: !p[item.id] }))}
-                        style={{
-                          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                       >
                         <span style={{ fontSize: 13, color: COLORS.textPrimary, fontWeight: 500 }}>{item.query}</span>
-                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 12, flexShrink: 0 }}>
-                          {expanded[item.id] ? '▲ hide' : '▼ show'}
-                        </span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 12, flexShrink: 0 }}>{expanded[item.id] ? '▲ hide' : '▼ show'}</span>
                       </button>
                       {expanded[item.id] && (
-                        <div style={{ padding: '0 20px 16px', borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
-                          <div
-                            className="md-body"
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }}
-                          />
+                        <div style={{ padding: '14px 20px 16px', borderTop: `1px solid ${COLORS.border}` }}>
+                          <MarkdownAnswer text={item.text} />
                         </div>
                       )}
                     </div>
@@ -344,7 +430,6 @@ function Search({ currentUser, tasks, needs, decisions, updates, meetings }) {
         <div style={{ textAlign: 'center', marginTop: 36, fontSize: 12, color: COLORS.textMuted }}>
           AI search · powered by Claude
         </div>
-
       </div>
     </div>
   );
