@@ -122,45 +122,45 @@ function App() {
       onTask: ({ eventType, new: n, old: o }) => {
         if (eventType === 'DELETE') {
           setTasks(prev => prev.filter(t => t.id !== o.id));
+        } else if (eventType === 'INSERT') {
+          const t = DB.taskFromDB(n);
+          setTasks(prev => prev.find(x => x.id === t.id) ? prev : [...prev, t]);
         } else {
           const t = DB.taskFromDB(n);
-          setTasks(prev => {
-            const filtered = prev.filter(x => x.id !== t.id);
-            return eventType === 'INSERT' ? [...filtered, t] : filtered.map(x => x.id === t.id ? t : x);
-          });
+          setTasks(prev => prev.map(x => x.id === t.id ? t : x));
         }
       },
       onNeed: ({ eventType, new: n, old: o }) => {
         if (eventType === 'DELETE') {
           setNeeds(prev => prev.filter(x => x.id !== o.id));
+        } else if (eventType === 'INSERT') {
+          const item = DB.needFromDB(n);
+          setNeeds(prev => prev.find(x => x.id === item.id) ? prev : [...prev, item]);
         } else {
           const item = DB.needFromDB(n);
-          setNeeds(prev => {
-            const f = prev.filter(x => x.id !== item.id);
-            return eventType === 'INSERT' ? [...f, item] : f.map(x => x.id === item.id ? item : x);
-          });
+          setNeeds(prev => prev.map(x => x.id === item.id ? item : x));
         }
       },
       onDecision: ({ eventType, new: n, old: o }) => {
         if (eventType === 'DELETE') {
           setDecisions(prev => prev.filter(x => x.id !== o.id));
+        } else if (eventType === 'INSERT') {
+          const d = DB.decisionFromDB(n);
+          setDecisions(prev => prev.find(x => x.id === d.id) ? prev : [...prev, d]);
         } else {
           const d = DB.decisionFromDB(n);
-          setDecisions(prev => {
-            const f = prev.filter(x => x.id !== d.id);
-            return eventType === 'INSERT' ? [...f, d] : f.map(x => x.id === d.id ? d : x);
-          });
+          setDecisions(prev => prev.map(x => x.id === d.id ? d : x));
         }
       },
       onMeeting: ({ eventType, new: n, old: o }) => {
         if (eventType === 'DELETE') {
           setMeetings(prev => prev.filter(x => x.id !== o.id));
+        } else if (eventType === 'INSERT') {
+          const m = DB.meetingFromDB(n);
+          setMeetings(prev => prev.find(x => x.id === m.id) ? prev : [m, ...prev]);
         } else {
           const m = DB.meetingFromDB(n);
-          setMeetings(prev => {
-            const f = prev.filter(x => x.id !== m.id);
-            return eventType === 'INSERT' ? [m, ...f] : f.map(x => x.id === m.id ? m : x);
-          });
+          setMeetings(prev => prev.map(x => x.id === m.id ? m : x));
         }
       },
       onUpdate: ({ new: n }) => {
