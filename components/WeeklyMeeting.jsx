@@ -611,6 +611,15 @@ function WeeklyMeeting({ currentUser, meetings, setMeetings, updates, setUpdates
   const [activeTab, setActiveTab] = React.useState('updates');
   const [showNewForm, setShowNewForm] = React.useState(false);
 
+  // When meetings load from Supabase the IDs change — reselect the first meeting
+  // if the current selectedId no longer exists in the list
+  React.useEffect(() => {
+    if (meetings.length === 0) return;
+    if (!selectedId || !meetings.find(m => m.id === selectedId)) {
+      setSelectedId(meetings[0].id);
+    }
+  }, [meetings]);
+
   const meeting = meetings.find(m => m.id === selectedId);
 
   function addMeeting(data) {

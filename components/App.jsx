@@ -100,11 +100,11 @@ function App() {
     setDbError(null);
     DB.fetchAll()
       .then(data => {
-        if (data.meetings.length  > 0) setMeetings(data.meetings);
-        if (data.tasks.length     > 0) setTasks(data.tasks);
-        if (data.needs.length     > 0) setNeeds(data.needs);
-        if (data.decisions.length > 0) setDecisions(data.decisions);
-        if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
+        if (data.meetings.length  > 0) { setMeetings(data.meetings);  localStorage.setItem('bgh-meetings',   JSON.stringify(data.meetings)); }
+        if (data.tasks.length     > 0) { setTasks(data.tasks);        localStorage.setItem('bgh-tasks',      JSON.stringify(data.tasks)); }
+        if (data.needs.length     > 0) { setNeeds(data.needs);        localStorage.setItem('bgh-needs',      JSON.stringify(data.needs)); }
+        if (data.decisions.length > 0) { setDecisions(data.decisions);localStorage.setItem('bgh-decisions',  JSON.stringify(data.decisions)); }
+        if (Object.keys(data.updates).length > 0) { setUpdates(data.updates); localStorage.setItem('bgh-updates', JSON.stringify(data.updates)); }
         dbLoadedRef.current = true;
       })
       .catch(e => {
