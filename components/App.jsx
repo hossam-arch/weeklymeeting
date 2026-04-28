@@ -77,29 +77,28 @@ function App() {
 
   const [dbLoading, setDbLoading] = React.useState(false);
   // Gate: don't sync initial localStorage/INIT data to Supabase; only sync after DB load
-  const dbLoadedRef = React.useRef(false);
+  const dbLoadedRef  = React.useRef(false);
+  // Prevent fetchAll from running more than once (authMode can cycle during token refresh)
+  const dbFetchedRef = React.useRef(false);
 
-  // ── LOAD FROM SUPABASE (runs once auth is confirmed) ─────────────────────
+  // ── LOAD FROM SUPABASE (runs once, only after auth is confirmed) ─────────
   React.useEffect(() => {
     if (!DB.isConfigured()) {
       dbLoadedRef.current = true; // localStorage-only mode: allow syncing immediately
       return;
     }
-    if (authMode !== 'app') return; // wait until session is established before fetching
+    if (authMode !== 'app') return;      // wait until session is established
+    if (dbFetchedRef.current) return;    // only fetch once — authMode can cycle during token refresh
+    dbFetchedRef.current = true;
     setDbLoading(true);
     DB.fetchAll()
       .then(data => {
-        // Override local state with authoritative DB data
+        // Override local state with authoritative DB data; never wipe to [] if DB returns empty
         if (data.meetings.length  > 0) setMeetings(data.meetings);
-        else setMeetings([]);
         if (data.tasks.length     > 0) setTasks(data.tasks);
-        else setTasks([]);
         if (data.needs.length     > 0) setNeeds(data.needs);
-        else setNeeds([]);
         if (data.decisions.length > 0) setDecisions(data.decisions);
-        else setDecisions([]);
         if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
-        else setUpdates({});
         dbLoadedRef.current = true; // NOW allow syncing user changes
       })
       .catch(e => { console.error('Supabase load:', e); dbLoadedRef.current = true; })
