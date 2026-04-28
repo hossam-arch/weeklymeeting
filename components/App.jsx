@@ -209,8 +209,10 @@ function App() {
 
   // ── AUTH HANDLERS ─────────────────────────────────────────────────────────
   async function handleLogout() {
-    await DB.signOut();
-    // onAuthChange handles clearing currentUser and authMode
+    // Clear state immediately — don't wait for the SIGNED_OUT event
+    setCurrentUser(null);
+    setAuthMode('login');
+    DB.signOut().catch(console.error); // fire-and-forget
   }
 
   function retryLoad() {
