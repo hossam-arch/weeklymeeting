@@ -28,11 +28,11 @@ const COLORS = {
 // ─── TEAM ─────────────────────────────────────────────────────────────────────
 const TEAM = [
   { id: 'shams',  name: 'Shams',  email: 'shams@orcas.io',   role: 'Marketing',       initials: 'S',  color: '#8B5CF6' },
-  { id: 'amira',  name: 'Amira',  email: 'amira@orcas.io',   role: 'Orcas Lead',      initials: 'A',  color: '#10B981' },
+  { id: 'amira',  name: 'Amira',  email: 'amira@orcas.io',   role: 'COO',             initials: 'A',  color: '#10B981' },
   { id: 'yousef', name: 'Yousef', email: 'yousef@baims.com',  role: 'CEO',             initials: 'Y',  color: '#0EA5E9' },
   { id: 'ahmad',  name: 'Ahmad',  email: 'ahmad@baims.com',   role: 'Baims Kuwait',   initials: 'AH', color: '#F59E0B' },
   { id: 'bader',  name: 'Bader',  email: 'bader@baims.com',   role: 'Product',        initials: 'B',  color: '#EC4899' },
-  { id: 'hossam', name: 'Hossam', email: 'hossam@orcas.io',  role: 'Strategy & Tech', initials: 'H',  color: '#EF4444' },
+  { id: 'hossam', name: 'Hossam', email: 'hossam@orcas.io',  role: 'Strategy',        initials: 'H',  color: '#EF4444' },
   { id: 'khalaf', name: 'Khalaf', email: 'khalaf@orcas.io',  role: 'Tech',            initials: 'K',  color: '#F97316' },
 ];
 

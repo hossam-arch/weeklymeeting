@@ -142,16 +142,17 @@ function KPIsTab() {
 
 // ─── UPDATES TAB ──────────────────────────────────────────────────────────────
 function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
-  const [editMode, setEditMode] = React.useState(false);
-  const [draft, setDraft] = React.useState({});
-  const [flash, setFlash] = React.useState(null);
+  const isAdmin = currentUser.id === 'hossam';
+  const [editingId, setEditingId] = React.useState(null); // which member row is being edited
+  const [draft, setDraft]         = React.useState({});
+  const [flash, setFlash]         = React.useState(null);
 
   const meetingUpdates = updates[meetingId] || {};
 
-  function startEdit() {
-    const userRow = meetingUpdates[currentUser.id] || { general: '', budget: '', needs: '', launch: '' };
-    setDraft({ ...userRow });
-    setEditMode(true);
+  function startEdit(memberId) {
+    const row = meetingUpdates[memberId] || { general: '', budget: '', needs: '', launch: '' };
+    setDraft({ ...row });
+    setEditingId(memberId);
   }
 
   function save() {
@@ -160,11 +161,11 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
       ...prev,
       [meetingId]: {
         ...(prev[meetingId] || {}),
-        [currentUser.id]: { ...draft, lastEdited: now },
+        [editingId]: { ...draft, lastEdited: now },
       },
     }));
-    setEditMode(false);
-    setFlash(currentUser.id);
+    setFlash(editingId);
+    setEditingId(null);
     setTimeout(() => setFlash(null), 1500);
   }
 
@@ -177,14 +178,6 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
 
   return (
     <div style={{ overflow: 'auto' }}>
-      {/* Toolbar */}
-      <div style={{ padding: '12px 24px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-        {editMode
-          ? <><Btn variant="primary" size="sm" onClick={save}>Save my row</Btn><Btn size="sm" onClick={() => setEditMode(false)}>Cancel</Btn></>
-          : <Btn size="sm" onClick={startEdit}>✎ Edit my row</Btn>
-        }
-      </div>
-
       {/* Table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
@@ -193,13 +186,15 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
             {cols.map(c => (
               <th key={c.key} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: COLORS.textSecondary }}>{c.label}</th>
             ))}
+            <th style={{ width: 90 }} />
           </tr>
         </thead>
         <tbody>
           {TEAM.map(member => {
             const row = meetingUpdates[member.id] || {};
             const isMe = member.id === currentUser.id;
-            const isEditing = isMe && editMode;
+            const canEdit = isMe || isAdmin;
+            const isEditing = editingId === member.id;
             const isFlashing = flash === member.id;
             return (
               <tr key={member.id} style={{
@@ -246,6 +241,25 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
                     )}
                   </td>
                 ))}
+
+                {/* Action cell */}
+                <td style={{ padding: '14px 12px', verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <Btn variant="primary" size="sm" onClick={save}>Save</Btn>
+                      <Btn size="sm" onClick={() => setEditingId(null)}>Cancel</Btn>
+                    </div>
+                  ) : canEdit && !editingId ? (
+                    <button onClick={() => startEdit(member.id)} style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: COLORS.textMuted, fontSize: 13, padding: '2px 6px', borderRadius: 4,
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.color = COLORS.brand}
+                      onMouseLeave={e => e.currentTarget.style.color = COLORS.textMuted}
+                      title={isMe ? 'Edit my row' : `Edit ${member.name}'s row`}
+                    >✎</button>
+                  ) : null}
+                </td>
               </tr>
             );
           })}
