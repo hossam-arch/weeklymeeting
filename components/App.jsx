@@ -76,38 +76,48 @@ function App() {
   });
 
   const [dbLoading, setDbLoading] = React.useState(false);
+  const [dbError, setDbError]     = React.useState(null);
   // Gate: don't sync initial localStorage/INIT data to Supabase; only sync after DB load
   const dbLoadedRef  = React.useRef(false);
-  // Prevent fetchAll from running more than once (authMode can cycle during token refresh)
+  // Prevent fetchAll from running more than once per login session
   const dbFetchedRef = React.useRef(false);
 
-  // ── LOAD FROM SUPABASE (runs once, only after auth is confirmed) ─────────
+  // ── LOAD FROM SUPABASE (triggered by currentUser, once per login session) ─
   React.useEffect(() => {
     if (!DB.isConfigured()) {
-      dbLoadedRef.current = true; // localStorage-only mode: allow syncing immediately
+      dbLoadedRef.current = true; // localStorage-only mode
       return;
     }
-    if (authMode !== 'app') return;      // wait until session is established
-    if (dbFetchedRef.current) return;    // only fetch once — authMode can cycle during token refresh
+    if (!currentUser) {
+      // User logged out — reset so next login triggers a fresh fetch
+      dbFetchedRef.current = false;
+      dbLoadedRef.current  = false;
+      return;
+    }
+    if (dbFetchedRef.current) return; // already fetched this session
     dbFetchedRef.current = true;
     setDbLoading(true);
+    setDbError(null);
     DB.fetchAll()
       .then(data => {
-        // Override local state with authoritative DB data; never wipe to [] if DB returns empty
         if (data.meetings.length  > 0) setMeetings(data.meetings);
         if (data.tasks.length     > 0) setTasks(data.tasks);
         if (data.needs.length     > 0) setNeeds(data.needs);
         if (data.decisions.length > 0) setDecisions(data.decisions);
         if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
-        dbLoadedRef.current = true; // NOW allow syncing user changes
+        dbLoadedRef.current = true;
       })
-      .catch(e => { console.error('Supabase load:', e); dbLoadedRef.current = true; })
+      .catch(e => {
+        console.error('Supabase load:', e);
+        setDbError(e.message || 'Failed to load data from Supabase.');
+        dbLoadedRef.current = true;
+      })
       .finally(() => setDbLoading(false));
-  }, [authMode]);
+  }, [currentUser]);
 
   // ── REALTIME SUBSCRIPTIONS ────────────────────────────────────────────────
   React.useEffect(() => {
-    if (!DB.isConfigured() || authMode !== 'app') return;
+    if (!DB.isConfigured() || !currentUser) return;
     const channel = DB.subscribe({
       onTask: ({ eventType, new: n, old: o }) => {
         if (eventType === 'DELETE') {
@@ -169,7 +179,7 @@ function App() {
       },
     });
     return () => { channel && channel.unsubscribe && channel.unsubscribe(); };
-  }, [authMode]);
+  }, [currentUser]);
 
   // ── PERSIST (localStorage always; Supabase only after initial DB load) ────
   React.useEffect(() => {
@@ -201,6 +211,24 @@ function App() {
   async function handleLogout() {
     await DB.signOut();
     // onAuthChange handles clearing currentUser and authMode
+  }
+
+  function retryLoad() {
+    dbFetchedRef.current = false;
+    setDbError(null);
+    setDbLoading(true);
+    DB.fetchAll()
+      .then(data => {
+        if (data.meetings.length  > 0) setMeetings(data.meetings);
+        if (data.tasks.length     > 0) setTasks(data.tasks);
+        if (data.needs.length     > 0) setNeeds(data.needs);
+        if (data.decisions.length > 0) setDecisions(data.decisions);
+        if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
+        dbLoadedRef.current  = true;
+        dbFetchedRef.current = true;
+      })
+      .catch(e => { setDbError(e.message || 'Failed to load data.'); })
+      .finally(() => setDbLoading(false));
   }
 
   // Called by Setup after a successful import/migration to reload from Supabase
@@ -237,7 +265,7 @@ function App() {
       />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {/* DB loading banner */}
+        {/* DB loading / error banners */}
         {dbLoading && (
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
@@ -245,6 +273,20 @@ function App() {
             padding: '6px 16px', fontSize: 12, fontWeight: 600, textAlign: 'center',
           }}>
             Loading data from Supabase…
+          </div>
+        )}
+        {dbError && !dbLoading && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+            background: COLORS.red, color: '#fff',
+            padding: '6px 16px', fontSize: 12, fontWeight: 600, textAlign: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+          }}>
+            ⚠ Supabase load failed: {dbError}
+            <button onClick={retryLoad}
+              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+              Retry
+            </button>
           </div>
         )}
 

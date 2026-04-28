@@ -107,26 +107,10 @@ function Sidebar({ currentView, onNavigate, currentUser, onLogout, collapsed, on
           display: 'flex', alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between', gap: 10,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Avatar memberId={currentUser.id} size={32} />
-            {!collapsed && (
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 12, color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  {currentUser.name}
-                  <span title={dbConnected ? 'Supabase connected' : 'localStorage only'} style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: dbConnected ? COLORS.green : '#6B7280',
-                    flexShrink: 0,
-                  }} />
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{currentUser.role}</div>
-              </div>
-            )}
-          </div>
-          {!collapsed && (
+          {collapsed ? (
             <button
               onClick={onLogout}
-              title="Logout"
+              title={`Logout (${currentUser.name})`}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: 'rgba(255,255,255,0.35)', padding: 4, fontSize: 14,
@@ -137,6 +121,36 @@ function Sidebar({ currentView, onNavigate, currentUser, onLogout, collapsed, on
             >
               ⏻
             </button>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Avatar memberId={currentUser.id} size={32} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {currentUser.name}
+                    <span title={dbConnected ? 'Supabase connected' : 'localStorage only'} style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: dbConnected ? COLORS.green : '#6B7280',
+                      flexShrink: 0,
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{currentUser.role}</div>
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                title="Logout"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.35)', padding: 4, fontSize: 14,
+                  borderRadius: 4, display: 'flex', alignItems: 'center',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
+              >
+                ⏻
+              </button>
+            </>
           )}
         </div>
       )}
