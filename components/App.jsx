@@ -79,12 +79,13 @@ function App() {
   // Gate: don't sync initial localStorage/INIT data to Supabase; only sync after DB load
   const dbLoadedRef = React.useRef(false);
 
-  // ── LOAD FROM SUPABASE on mount (if configured) ───────────────────────────
+  // ── LOAD FROM SUPABASE (runs once auth is confirmed) ─────────────────────
   React.useEffect(() => {
     if (!DB.isConfigured()) {
       dbLoadedRef.current = true; // localStorage-only mode: allow syncing immediately
       return;
     }
+    if (authMode !== 'app') return; // wait until session is established before fetching
     setDbLoading(true);
     DB.fetchAll()
       .then(data => {
@@ -103,11 +104,11 @@ function App() {
       })
       .catch(e => { console.error('Supabase load:', e); dbLoadedRef.current = true; })
       .finally(() => setDbLoading(false));
-  }, []);
+  }, [authMode]);
 
   // ── REALTIME SUBSCRIPTIONS ────────────────────────────────────────────────
   React.useEffect(() => {
-    if (!DB.isConfigured()) return;
+    if (!DB.isConfigured() || authMode !== 'app') return;
     const channel = DB.subscribe({
       onTask: ({ eventType, new: n, old: o }) => {
         if (eventType === 'DELETE') {
@@ -169,7 +170,7 @@ function App() {
       },
     });
     return () => { channel && channel.unsubscribe && channel.unsubscribe(); };
-  }, []);
+  }, [authMode]);
 
   // ── PERSIST (localStorage always; Supabase only after initial DB load) ────
   React.useEffect(() => {
