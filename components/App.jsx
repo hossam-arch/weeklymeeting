@@ -77,10 +77,16 @@ function App() {
 
   const [dbLoading, setDbLoading] = React.useState(false);
   const [dbError, setDbError]     = React.useState(null);
-  // Gate: don't sync initial localStorage/INIT data to Supabase; only sync after DB load
-  const dbLoadedRef  = React.useRef(false);
-  // Prevent fetchAll from running more than once per login session
-  const dbFetchedRef = React.useRef(false);
+  const dbLoadedRef   = React.useRef(false); // gate: only sync after initial DB load
+  const dbFetchedRef  = React.useRef(false); // prevent multiple fetchAll per session
+  const fromDBRef     = React.useRef(0);     // skip syncs for state updates that came FROM Supabase
+  const syncTimers    = React.useRef({});    // debounce timers keyed by table name
+
+  // Debounce helper — cancels any pending sync for this table and schedules a new one
+  function scheduleSync(key, fn) {
+    clearTimeout(syncTimers.current[key]);
+    syncTimers.current[key] = setTimeout(fn, 2000);
+  }
 
   // ── LOAD FROM SUPABASE (triggered by currentUser, once per login session) ─
   React.useEffect(() => {
@@ -100,11 +106,13 @@ function App() {
     setDbError(null);
     DB.fetchAll()
       .then(data => {
-        if (data.meetings.length  > 0) { setMeetings(data.meetings);  localStorage.setItem('bgh-meetings',   JSON.stringify(data.meetings)); }
-        if (data.tasks.length     > 0) { setTasks(data.tasks);        localStorage.setItem('bgh-tasks',      JSON.stringify(data.tasks)); }
-        if (data.needs.length     > 0) { setNeeds(data.needs);        localStorage.setItem('bgh-needs',      JSON.stringify(data.needs)); }
-        if (data.decisions.length > 0) { setDecisions(data.decisions);localStorage.setItem('bgh-decisions',  JSON.stringify(data.decisions)); }
-        if (Object.keys(data.updates).length > 0) { setUpdates(data.updates); localStorage.setItem('bgh-updates', JSON.stringify(data.updates)); }
+        let skips = 0;
+        if (data.meetings.length  > 0) { setMeetings(data.meetings);  localStorage.setItem('bgh-meetings',  JSON.stringify(data.meetings));  skips++; }
+        if (data.tasks.length     > 0) { setTasks(data.tasks);        localStorage.setItem('bgh-tasks',     JSON.stringify(data.tasks));     skips++; }
+        if (data.needs.length     > 0) { setNeeds(data.needs);        localStorage.setItem('bgh-needs',     JSON.stringify(data.needs));     skips++; }
+        if (data.decisions.length > 0) { setDecisions(data.decisions);localStorage.setItem('bgh-decisions', JSON.stringify(data.decisions)); skips++; }
+        if (Object.keys(data.updates).length > 0) { setUpdates(data.updates); localStorage.setItem('bgh-updates', JSON.stringify(data.updates)); skips++; }
+        fromDBRef.current   = skips; // persist effects will skip these syncs
         dbLoadedRef.current = true;
       })
       .catch(e => {
@@ -181,30 +189,40 @@ function App() {
     return () => { channel && channel.unsubscribe && channel.unsubscribe(); };
   }, [currentUser]);
 
-  // ── PERSIST (localStorage always; Supabase only after initial DB load) ────
+  // ── PERSIST (localStorage immediately; Supabase debounced, skipping post-load echoes) ──
   React.useEffect(() => {
     localStorage.setItem('bgh-meetings', JSON.stringify(meetings));
-    if (DB.isConfigured() && dbLoadedRef.current) DB.syncMeetings(meetings).catch(console.error);
+    if (!DB.isConfigured() || !dbLoadedRef.current) return;
+    if (fromDBRef.current > 0) { fromDBRef.current--; return; }
+    scheduleSync('meetings', () => DB.syncMeetings(meetings).catch(console.error));
   }, [meetings]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-tasks', JSON.stringify(tasks));
-    if (DB.isConfigured() && dbLoadedRef.current) DB.syncTasks(tasks).catch(console.error);
+    if (!DB.isConfigured() || !dbLoadedRef.current) return;
+    if (fromDBRef.current > 0) { fromDBRef.current--; return; }
+    scheduleSync('tasks', () => DB.syncTasks(tasks).catch(console.error));
   }, [tasks]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-needs', JSON.stringify(needs));
-    if (DB.isConfigured() && dbLoadedRef.current) DB.syncNeeds(needs).catch(console.error);
+    if (!DB.isConfigured() || !dbLoadedRef.current) return;
+    if (fromDBRef.current > 0) { fromDBRef.current--; return; }
+    scheduleSync('needs', () => DB.syncNeeds(needs).catch(console.error));
   }, [needs]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-decisions', JSON.stringify(decisions));
-    if (DB.isConfigured() && dbLoadedRef.current) DB.syncDecisions(decisions).catch(console.error);
+    if (!DB.isConfigured() || !dbLoadedRef.current) return;
+    if (fromDBRef.current > 0) { fromDBRef.current--; return; }
+    scheduleSync('decisions', () => DB.syncDecisions(decisions).catch(console.error));
   }, [decisions]);
 
   React.useEffect(() => {
     localStorage.setItem('bgh-updates', JSON.stringify(updates));
-    if (DB.isConfigured() && dbLoadedRef.current) DB.syncUpdates(updates).catch(console.error);
+    if (!DB.isConfigured() || !dbLoadedRef.current) return;
+    if (fromDBRef.current > 0) { fromDBRef.current--; return; }
+    scheduleSync('updates', () => DB.syncUpdates(updates).catch(console.error));
   }, [updates]);
 
   // ── AUTH HANDLERS ─────────────────────────────────────────────────────────
@@ -221,11 +239,13 @@ function App() {
     setDbLoading(true);
     DB.fetchAll()
       .then(data => {
-        if (data.meetings.length  > 0) setMeetings(data.meetings);
-        if (data.tasks.length     > 0) setTasks(data.tasks);
-        if (data.needs.length     > 0) setNeeds(data.needs);
-        if (data.decisions.length > 0) setDecisions(data.decisions);
-        if (Object.keys(data.updates).length > 0) setUpdates(data.updates);
+        let skips = 0;
+        if (data.meetings.length  > 0) { setMeetings(data.meetings);  localStorage.setItem('bgh-meetings',  JSON.stringify(data.meetings));  skips++; }
+        if (data.tasks.length     > 0) { setTasks(data.tasks);        localStorage.setItem('bgh-tasks',     JSON.stringify(data.tasks));     skips++; }
+        if (data.needs.length     > 0) { setNeeds(data.needs);        localStorage.setItem('bgh-needs',     JSON.stringify(data.needs));     skips++; }
+        if (data.decisions.length > 0) { setDecisions(data.decisions);localStorage.setItem('bgh-decisions', JSON.stringify(data.decisions)); skips++; }
+        if (Object.keys(data.updates).length > 0) { setUpdates(data.updates); localStorage.setItem('bgh-updates', JSON.stringify(data.updates)); skips++; }
+        fromDBRef.current    = skips;
         dbLoadedRef.current  = true;
         dbFetchedRef.current = true;
       })
