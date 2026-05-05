@@ -81,6 +81,7 @@ function App() {
   const dbFetchedRef  = React.useRef(false); // prevent multiple fetchAll per session
   const fromDBRef     = React.useRef(0);     // skip syncs for state updates that came FROM Supabase
   const syncTimers    = React.useRef({});    // debounce timers keyed by table name
+  const autoNextRef   = React.useRef(false); // gate: auto-create next meeting once per session
 
   // Debounce helper — cancels any pending sync for this table and schedules a new one
   function scheduleSync(key, fn) {
@@ -98,6 +99,7 @@ function App() {
       // User logged out — reset so next login triggers a fresh fetch
       dbFetchedRef.current = false;
       dbLoadedRef.current  = false;
+      autoNextRef.current  = false;
       return;
     }
     if (dbFetchedRef.current) return; // already fetched this session
@@ -122,6 +124,57 @@ function App() {
       })
       .finally(() => setDbLoading(false));
   }, [currentUser]);
+
+  // ── AUTO-CREATE NEXT MEETING ─────────────────────────────────────────────
+  // Runs once per session after data loads. If today >= most recent meeting's
+  // start date + 1 day and no future meeting exists, silently creates the next one.
+  React.useEffect(() => {
+    if (!dbLoadedRef.current || dbLoading) return;
+    if (autoNextRef.current) return;
+    if (meetings.length === 0) return;
+    autoNextRef.current = true;
+
+    const withDates = meetings.filter(m => m.startDate);
+    if (withDates.length === 0) return;
+    const latest = withDates.reduce((a, b) => a.startDate > b.startDate ? a : b);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const triggerDate = (() => {
+      const d = new Date(latest.startDate + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    })();
+    if (today < triggerDate) return;
+
+    if (meetings.some(m => m.startDate && m.startDate > latest.startDate)) return;
+
+    const nextStart = new Date(latest.startDate + 'T00:00:00');
+    nextStart.setDate(nextStart.getDate() + 7);
+    const nextEnd = new Date(latest.startDate + 'T00:00:00');
+    nextEnd.setDate(nextEnd.getDate() + 13);
+
+    const toISO = d => d.toISOString().slice(0, 10);
+    const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const weekNum = Math.ceil((((nextStart - new Date(nextStart.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
+
+    const newMeeting = {
+      id: generateId('week'),
+      label: `Week ${weekNum}`,
+      dateRange: `${fmt(nextStart)} – ${fmt(nextEnd)}`,
+      startDate: toISO(nextStart),
+      endDate: toISO(nextEnd),
+      chairmanId: 'yousef',
+      status: 'Draft',
+      targetDuration: 60,
+      actualDuration: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    setMeetings(prev => {
+      if (prev.some(m => m.startDate && m.startDate > latest.startDate)) return prev;
+      return [newMeeting, ...prev];
+    });
+  }, [meetings, dbLoading]);
 
   // ── REALTIME SUBSCRIPTIONS ────────────────────────────────────────────────
   React.useEffect(() => {
