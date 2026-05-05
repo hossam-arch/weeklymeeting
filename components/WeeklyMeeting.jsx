@@ -363,6 +363,9 @@ function NeedsTab({ meetingId, currentUser, needs, setNeeds }) {
                     {isRequester && need.status !== 'done' && (
                       <Btn variant="ghost" size="sm" onClick={() => cancelNeed(need.id)}>✕ Cancel</Btn>
                     )}
+                    {currentUser.id === 'hossam' && (
+                      <Btn variant="danger" size="sm" onClick={() => { if (window.confirm('Delete this request? This cannot be undone.')) cancelNeed(need.id); }}>🗑</Btn>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -521,7 +524,7 @@ function DecisionsTab({ meetingId, currentUser, decisions, setDecisions }) {
                         <Btn size="sm" onClick={() => defer(dec.id)}>→ Defer</Btn>
                       </>
                     )}
-                    {(dec.ownerId === currentUser.id || dec.status !== 'open') && (
+                    {currentUser.id === 'hossam' && (
                       <Btn variant="danger" size="sm" onClick={() => deleteDecision(dec.id)}>🗑</Btn>
                     )}
                   </div>
