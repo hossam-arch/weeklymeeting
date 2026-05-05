@@ -141,7 +141,7 @@ function App() {
     const today = new Date().toISOString().slice(0, 10);
     const triggerDate = (() => {
       const d = new Date(latest.startDate + 'T00:00:00');
-      d.setDate(d.getDate() + 1);
+      d.setDate(d.getDate() + 2);
       return d.toISOString().slice(0, 10);
     })();
     if (today < triggerDate) return;
