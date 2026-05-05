@@ -235,7 +235,7 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
                         }}
                       />
                     ) : (
-                      <span style={{ fontSize: 13, color: row[col.key] ? COLORS.textPrimary : COLORS.textMuted, lineHeight: 1.5 }}>
+                      <span style={{ fontSize: 13, color: row[col.key] ? COLORS.textPrimary : COLORS.textMuted, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                         {row[col.key] || '—'}
                       </span>
                     )}
