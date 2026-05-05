@@ -169,24 +169,14 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
     setTimeout(() => setFlash(null), 1500);
   }
 
-  const cols = [
-    { key: 'general', label: 'GENERAL UPDATE' },
-    { key: 'budget',  label: 'BUDGET' },
-    { key: 'needs',   label: 'I NEED / FROM' },
-    { key: 'launch',  label: 'LAUNCH / PROJECTS' },
-  ];
-
   return (
-    <div style={{ overflow: 'auto' }}>
-      {/* Table */}
+    <div style={{ overflow: 'auto', height: '100%' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr style={{ background: COLORS.grayLight, borderBottom: `1px solid ${COLORS.border}` }}>
-            <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: COLORS.textSecondary, width: 180 }}>MEMBER</th>
-            {cols.map(c => (
-              <th key={c.key} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: COLORS.textSecondary }}>{c.label}</th>
-            ))}
-            <th style={{ width: 90 }} />
+            <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: COLORS.textSecondary, width: 200, position: 'sticky', top: 0, background: COLORS.grayLight, zIndex: 2 }}>MEMBER</th>
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: COLORS.textSecondary, position: 'sticky', top: 0, background: COLORS.grayLight, zIndex: 2 }}>GENERAL UPDATE</th>
+            <th style={{ width: 110, position: 'sticky', top: 0, background: COLORS.grayLight, zIndex: 2 }} />
           </tr>
         </thead>
         <tbody>
@@ -203,7 +193,7 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
                 transition: 'background .4s',
               }}>
                 {/* Member */}
-                <td style={{ padding: '14px 20px', verticalAlign: 'top' }}>
+                <td style={{ padding: '14px 20px', verticalAlign: 'top', width: 200 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 3, height: 40, borderRadius: 2, background: member.color, flexShrink: 0 }} />
                     <Avatar memberId={member.id} size={32} />
@@ -219,31 +209,30 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
                   </div>
                 </td>
 
-                {/* Data cells */}
-                {cols.map(col => (
-                  <td key={col.key} style={{ padding: '14px 16px', verticalAlign: 'top', maxWidth: 220 }}>
-                    {isEditing ? (
-                      <textarea
-                        value={draft[col.key] || ''}
-                        onChange={e => setDraft(p => ({ ...p, [col.key]: e.target.value }))}
-                        rows={3}
-                        style={{
-                          width: '100%', padding: '6px 8px', borderRadius: 6,
-                          border: `1.5px solid ${COLORS.brand}`,
-                          fontSize: 12, resize: 'vertical', fontFamily: 'inherit',
-                          outline: 'none', background: '#fff',
-                        }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 13, color: row[col.key] ? COLORS.textPrimary : COLORS.textMuted, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                        {row[col.key] || '—'}
-                      </span>
-                    )}
-                  </td>
-                ))}
+                {/* General update cell */}
+                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                  {isEditing ? (
+                    <textarea
+                      value={draft.general || ''}
+                      onChange={e => setDraft(p => ({ ...p, general: e.target.value }))}
+                      rows={4}
+                      autoFocus
+                      style={{
+                        width: '100%', padding: '8px 10px', borderRadius: 6,
+                        border: `1.5px solid ${COLORS.brand}`,
+                        fontSize: 13, resize: 'vertical', fontFamily: 'inherit',
+                        outline: 'none', background: '#fff', lineHeight: 1.6,
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 13, color: row.general ? COLORS.textPrimary : COLORS.textMuted, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {row.general || '—'}
+                    </span>
+                  )}
+                </td>
 
                 {/* Action cell */}
-                <td style={{ padding: '14px 12px', verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <td style={{ padding: '14px 12px', verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap', width: 110 }}>
                   {isEditing ? (
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <Btn variant="primary" size="sm" onClick={save}>Save</Btn>
@@ -251,13 +240,17 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
                     </div>
                   ) : canEdit && !editingId ? (
                     <button onClick={() => startEdit(member.id)} style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: COLORS.textMuted, fontSize: 13, padding: '2px 6px', borderRadius: 4,
+                      background: isMe ? COLORS.brand + '15' : 'none',
+                      border: `1px solid ${isMe ? COLORS.brand : COLORS.border}`,
+                      cursor: 'pointer', borderRadius: 6,
+                      color: isMe ? COLORS.brand : COLORS.textSecondary,
+                      fontSize: 13, padding: '5px 12px',
+                      display: 'flex', alignItems: 'center', gap: 5,
                     }}
-                      onMouseEnter={e => e.currentTarget.style.color = COLORS.brand}
-                      onMouseLeave={e => e.currentTarget.style.color = COLORS.textMuted}
-                      title={isMe ? 'Edit my row' : `Edit ${member.name}'s row`}
-                    >✎</button>
+                      onMouseEnter={e => { e.currentTarget.style.background = COLORS.brand + '20'; e.currentTarget.style.borderColor = COLORS.brand; e.currentTarget.style.color = COLORS.brand; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isMe ? COLORS.brand + '15' : 'none'; e.currentTarget.style.borderColor = isMe ? COLORS.brand : COLORS.border; e.currentTarget.style.color = isMe ? COLORS.brand : COLORS.textSecondary; }}
+                      title={isMe ? 'Edit my update' : `Edit ${member.name}'s update`}
+                    >✎ Edit</button>
                   ) : null}
                 </td>
               </tr>
