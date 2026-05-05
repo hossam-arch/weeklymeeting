@@ -296,7 +296,12 @@ function NeedsTab({ meetingId, currentUser, needs, setNeeds }) {
   }
 
   function markDone(id) {
-    setNeeds(prev => prev.map(n => n.id === id ? { ...n, status: 'done' } : n));
+    setNeeds(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, status: 'done' } : n);
+      const changed = updated.find(n => n.id === id);
+      if (DB.isConfigured() && changed) DB.updateNeed(changed).catch(console.error);
+      return updated;
+    });
   }
 
   function cancelNeed(id) {
@@ -404,13 +409,23 @@ function DecisionsTab({ meetingId, currentUser, decisions, setDecisions }) {
   }
 
   function approve(id) {
-    setDecisions(prev => prev.map(d => d.id === id
-      ? { ...d, status: 'approved', approvedBy: currentUser.id, approvedAt: new Date().toISOString() }
-      : d));
+    setDecisions(prev => {
+      const updated = prev.map(d => d.id === id
+        ? { ...d, status: 'approved', approvedBy: currentUser.id, approvedAt: new Date().toISOString() }
+        : d);
+      const changed = updated.find(d => d.id === id);
+      if (DB.isConfigured() && changed) DB.updateDecision(changed).catch(console.error);
+      return updated;
+    });
   }
 
   function defer(id) {
-    setDecisions(prev => prev.map(d => d.id === id ? { ...d, status: 'deferred' } : d));
+    setDecisions(prev => {
+      const updated = prev.map(d => d.id === id ? { ...d, status: 'deferred' } : d);
+      const changed = updated.find(d => d.id === id);
+      if (DB.isConfigured() && changed) DB.updateDecision(changed).catch(console.error);
+      return updated;
+    });
   }
 
   function deleteDecision(id) {
@@ -643,11 +658,21 @@ function WeeklyMeeting({ currentUser, meetings, setMeetings, updates, setUpdates
   }
 
   function markComplete() {
-    setMeetings(prev => prev.map(m => m.id === selectedId ? { ...m, status: 'Complete' } : m));
+    setMeetings(prev => {
+      const updated = prev.map(m => m.id === selectedId ? { ...m, status: 'Complete' } : m);
+      const changed = updated.find(m => m.id === selectedId);
+      if (DB.isConfigured() && changed) DB.updateMeeting(changed).catch(console.error);
+      return updated;
+    });
   }
 
   function markActive() {
-    setMeetings(prev => prev.map(m => m.id === selectedId ? { ...m, status: 'Active' } : m));
+    setMeetings(prev => {
+      const updated = prev.map(m => m.id === selectedId ? { ...m, status: 'Active' } : m);
+      const changed = updated.find(m => m.id === selectedId);
+      if (DB.isConfigured() && changed) DB.updateMeeting(changed).catch(console.error);
+      return updated;
+    });
   }
 
   function deleteMeeting() {
@@ -710,7 +735,9 @@ function WeeklyMeeting({ currentUser, meetings, setMeetings, updates, setUpdates
                   {meeting.status === 'Draft' && (
                     <Btn variant="primary" size="sm" onClick={markActive}>▶ Start Meeting</Btn>
                   )}
-                  <Btn variant="danger" size="sm" onClick={deleteMeeting}>🗑</Btn>
+                  {currentUser.id === 'hossam' && (
+                    <Btn variant="danger" size="sm" onClick={deleteMeeting}>🗑</Btn>
+                  )}
                 </div>
               </div>
 

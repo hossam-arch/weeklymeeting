@@ -154,6 +154,20 @@ async function deleteMeeting(id) {
   await _sb.from('meetings').delete().eq('id', id);
 }
 
+// Update a single record immediately (status changes, completions — bypass debounce)
+async function updateMeeting(meeting) {
+  const { error } = await _sb.from('meetings').upsert([meetingToDB(meeting)]);
+  if (error) console.error('update meeting:', error);
+}
+async function updateNeed(need) {
+  const { error } = await _sb.from('needs').upsert([needToDB(need)]);
+  if (error) console.error('update need:', error);
+}
+async function updateDecision(decision) {
+  const { error } = await _sb.from('decisions').upsert([decisionToDB(decision)]);
+  if (error) console.error('update decision:', error);
+}
+
 // Delete everything — used by Setup "Reset Database"
 async function clearAll() {
   await Promise.all([
@@ -269,6 +283,7 @@ window.DB = {
   fetchAll,
   syncMeetings, syncTasks, syncNeeds, syncDecisions, syncUpdates,
   deleteTask, deleteNeed, deleteDecision, deleteMeeting, clearAll,
+  updateMeeting, updateNeed, updateDecision,
   subscribe,
   importMeetingBundle,
   testConnection,
