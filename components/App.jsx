@@ -81,7 +81,8 @@ function App() {
   const dbFetchedRef  = React.useRef(false); // prevent multiple fetchAll per session
   const fromDBRef     = React.useRef(0);     // skip syncs for state updates that came FROM Supabase
   const syncTimers    = React.useRef({});    // debounce timers keyed by table name
-  const autoNextRef   = React.useRef(false); // gate: auto-create next meeting once per session
+  const autoNextRef         = React.useRef(false); // gate: auto-create next meeting once per session
+  const skipUpdateSyncRef   = React.useRef(0);     // skip persist sync for updates that arrived from realtime
 
   // Debounce helper — cancels any pending sync for this table and schedules a new one
   function scheduleSync(key, fn) {
@@ -226,17 +227,26 @@ function App() {
       },
       onUpdate: ({ new: n }) => {
         if (!n) return;
-        setUpdates(prev => ({
-          ...prev,
-          [n.meeting_id]: {
-            ...(prev[n.meeting_id] || {}),
-            [n.user_id]: {
-              general: n.general || '', budget: n.budget || '',
-              needs: n.needs_text || '', launch: n.launch || '',
-              lastEdited: n.last_edited,
+        skipUpdateSyncRef.current++;
+        setUpdates(prev => {
+          const existing = (prev[n.meeting_id] || {})[n.user_id];
+          // Ignore stale realtime events — only apply if DB data is newer than local
+          if (existing?.lastEdited && n.last_edited && n.last_edited < existing.lastEdited) {
+            skipUpdateSyncRef.current--;
+            return prev;
+          }
+          return {
+            ...prev,
+            [n.meeting_id]: {
+              ...(prev[n.meeting_id] || {}),
+              [n.user_id]: {
+                general: n.general || '', budget: n.budget || '',
+                needs: n.needs_text || '', launch: n.launch || '',
+                lastEdited: n.last_edited,
+              },
             },
-          },
-        }));
+          };
+        });
       },
     });
     return () => { channel && channel.unsubscribe && channel.unsubscribe(); };
@@ -275,6 +285,7 @@ function App() {
     localStorage.setItem('bgh-updates', JSON.stringify(updates));
     if (!DB.isConfigured() || !dbLoadedRef.current) return;
     if (fromDBRef.current > 0) { fromDBRef.current--; return; }
+    if (skipUpdateSyncRef.current > 0) { skipUpdateSyncRef.current--; return; }
     scheduleSync('updates', () => DB.syncUpdates(updates).catch(console.error));
   }, [updates]);
 
