@@ -1,4 +1,16 @@
 
+// Guard: if DB failed to initialise (e.g. Supabase CDN unavailable), provide a no-op stub
+if (typeof DB === 'undefined') {
+  window.DB = { isConfigured: () => false, getSession: () => Promise.resolve({ data: { session: null } }),
+    onAuthChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signOut: () => Promise.resolve(), fetchAll: () => Promise.reject(new Error('DB unavailable')),
+    syncMeetings: () => {}, syncTasks: () => {}, syncNeeds: () => {}, syncDecisions: () => {}, syncUpdates: () => {},
+    deleteTask: () => {}, deleteNeed: () => {}, deleteDecision: () => {}, deleteMeeting: () => {},
+    updateMeeting: () => {}, updateNeed: () => {}, updateDecision: () => {},
+    subscribe: () => null, taskFromDB: r => r, needFromDB: r => r, decisionFromDB: r => r, meetingFromDB: r => r,
+  };
+}
+
 function App() {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   // 'loading' while checking session, 'login', 'recovery' (password reset), 'app'

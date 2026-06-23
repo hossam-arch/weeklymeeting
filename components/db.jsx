@@ -11,10 +11,12 @@ function init(url, key) {
 
 // Auto-initialise from config.js (runs immediately when this file loads)
 ;(function autoInit() {
-  const cfg = window.BGH_CONFIG;
-  if (cfg && cfg.supabaseUrl && cfg.supabaseUrl !== 'YOUR_SUPABASE_URL') {
-    init(cfg.supabaseUrl, cfg.supabaseKey);
-  }
+  try {
+    const cfg = window.BGH_CONFIG;
+    if (cfg && cfg.supabaseUrl && cfg.supabaseUrl !== 'YOUR_SUPABASE_URL') {
+      init(cfg.supabaseUrl, cfg.supabaseKey);
+    }
+  } catch(e) { console.error('DB init failed:', e); }
 })();
 
 // ─── SNAKE ↔ CAMEL CONVERTERS ────────────────────────────────────────────────
