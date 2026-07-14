@@ -170,6 +170,18 @@ async function updateDecision(decision) {
   if (error) console.error('update decision:', error);
 }
 
+async function saveUpdate(meetingId, userId, data) {
+  const row = {
+    id: `${meetingId}-${userId}`,
+    meeting_id: meetingId, user_id: userId,
+    general: data.general || '', budget: data.budget || '',
+    needs_text: data.needs || '', launch: data.launch || '',
+    last_edited: data.lastEdited || new Date().toISOString(),
+  };
+  const { error } = await _sb.from('updates').upsert([row]);
+  if (error) throw error;
+}
+
 // Delete everything — used by Setup "Reset Database"
 async function clearAll() {
   await Promise.all([
@@ -285,7 +297,7 @@ window.DB = {
   fetchAll,
   syncMeetings, syncTasks, syncNeeds, syncDecisions, syncUpdates,
   deleteTask, deleteNeed, deleteDecision, deleteMeeting, clearAll,
-  updateMeeting, updateNeed, updateDecision,
+  updateMeeting, updateNeed, updateDecision, saveUpdate,
   subscribe,
   importMeetingBundle,
   testConnection,

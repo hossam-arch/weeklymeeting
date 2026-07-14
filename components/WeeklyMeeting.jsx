@@ -143,9 +143,10 @@ function KPIsTab() {
 // ─── UPDATES TAB ──────────────────────────────────────────────────────────────
 function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
   const isAdmin = currentUser.id === 'hossam';
-  const [editingId, setEditingId] = React.useState(null); // which member row is being edited
+  const [editingId, setEditingId] = React.useState(null);
   const [draft, setDraft]         = React.useState({});
   const [flash, setFlash]         = React.useState(null);
+  const [saving, setSaving]       = React.useState(false);
 
   const meetingUpdates = updates[meetingId] || {};
 
@@ -155,16 +156,29 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
     setEditingId(memberId);
   }
 
-  function save() {
+  async function save() {
     const now = new Date().toISOString();
+    const saved = { ...draft, lastEdited: now };
+    const savingFor = editingId;
+
+    // Update local state immediately
     setUpdates(prev => ({
       ...prev,
-      [meetingId]: {
-        ...(prev[meetingId] || {}),
-        [editingId]: { ...draft, lastEdited: now },
-      },
+      [meetingId]: { ...(prev[meetingId] || {}), [savingFor]: saved },
     }));
-    setFlash(editingId);
+
+    // Write directly to Supabase and wait for confirmation before closing
+    if (DB.isConfigured()) {
+      setSaving(true);
+      try {
+        await DB.saveUpdate(meetingId, savingFor, saved);
+      } catch(e) {
+        console.error('save update:', e);
+      }
+      setSaving(false);
+    }
+
+    setFlash(savingFor);
     setEditingId(null);
     setTimeout(() => setFlash(null), 1500);
   }
@@ -235,8 +249,10 @@ function UpdatesTab({ meetingId, currentUser, updates, setUpdates }) {
                 <td style={{ padding: '14px 12px', verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap', width: 110 }}>
                   {isEditing ? (
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <Btn variant="primary" size="sm" onClick={save}>Save</Btn>
-                      <Btn size="sm" onClick={() => setEditingId(null)}>Cancel</Btn>
+                      <Btn variant="primary" size="sm" onClick={save} disabled={saving}>
+                        {saving ? '⏳ Saving…' : 'Save'}
+                      </Btn>
+                      <Btn size="sm" onClick={() => setEditingId(null)} disabled={saving}>Cancel</Btn>
                     </div>
                   ) : canEdit && !editingId ? (
                     <button onClick={() => startEdit(member.id)} style={{
